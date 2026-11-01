@@ -39,7 +39,8 @@ def agent_header(key,show_recent=True):
     if not show_recent: item=st.session_state.get('agent_tests',{}).get(key)
     title,status=st.columns([4,1],vertical_alignment='center')
     title.title(meta['name'],icon=f":material/{meta['icon']}:")
-    with status: st.badge(item['status'] if item else '准备就绪',color='green' if not item or item['status']=='完成' else 'gray')
+    partial=bool(item and item.get('output',{}).get('online_status')=='failed')
+    with status: st.badge('本地完成' if partial else (item['status'] if item else '准备就绪'),color='orange' if partial else ('green' if not item or item['status']=='完成' else 'gray'))
     st.write(meta['role'])
     with st.expander('功能说明与使用范围',icon=':material/info:'):
         st.markdown('**你需要提供**　'+meta['input'])

@@ -18,7 +18,9 @@ if submitted:
         st.rerun()
 value=st.session_state.get('agent_tests',{}).get('risk')
 if value:
-    if value['status']=='完成': st.success('本次检查已完成，结果如下。')
+    if value.get('output',{}).get('online_status')=='failed': st.warning('本地检查已完成；在线复核失败，具体原因见结果。')
+    elif value.get('output',{}).get('online_status')=='completed': st.success('本地检查和在线复核均已完成，结果如下。')
+    elif value['status']=='完成': st.success('本地检查已完成，结果如下。')
     else: st.error('本次检查未完成，请查看提示。')
     st.caption('下面显示上次提交的结果。修改描述后，请再次点击运行。')
 test_result('risk')

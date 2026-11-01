@@ -1,6 +1,7 @@
 import streamlit as st
 
 ERRORS={'vision_not_configured':'请先配置支持图片输入的模型。','not_configured':'请完整配置接口地址、模型 ID 和 API 密钥。','http_error':'模型服务拒绝请求，请核对密钥、模型 ID 和结构化输出模式。','timeout':'模型响应超时，请稍后重试。','rate_limit':'模型服务繁忙，请稍后重试。','local_rate_limit':'本分钟请求较多，请稍后再试。','budget_overflow':'本次内容超过调用预算，请减少内容或调整设置。','session_budget_overflow':'当前会话额度已用完。','parse_failure':'模型回复格式不完整，已保留本地结果。','invalid_citation':'回复包含未检索到的来源，已拦截。'}
+ERRORS.update(output_truncated='模型达到输出长度上限，重试后仍未生成完整答案。',empty_response='模型返回了空答案，重试后仍无有效内容。',model_refusal='模型服务未提供可展示的答案，请调整描述后重试。',parse_failure='模型返回的字段不符合要求，未将其作为有效结果展示。',network_error='无法连接模型服务，请检查网络后重试。')
 def friendly_error(value): return ERRORS.get(value,'本次处理没有完成，请检查配置后重试。')
 
 def bullet(items):

@@ -26,6 +26,67 @@ class Tests(unittest.IsolatedAsyncioTestCase):
     async def test_structured_success(self):
         value=await self.call(lambda req:success())
         self.assertEqual(value.symptoms,['鼻痒'])
+    async def test_official_deepseek_structured_disables_thinking(self):
+        def handler(req):
+            body=json.loads(req.content)
+            self.assertEqual(body['thinking'],{'type':'disabled'})
+            self.assertEqual(body['max_tokens'],2048)
+            return success()
+        await self.call(handler,LLMConfig(base_url='https://api.deepseek.com/v1',model='deepseek-flash',api_key='synthetic',response_format='json_object'))
+    async def test_other_gateway_has_no_provider_specific_fields(self):
+        def handler(req):
+            self.assertNotIn('thinking',json.loads(req.content))
+            return success()
+        await self.call(handler)
+    async def test_truncated_output_retries_with_budget_and_no_reasoning_leak(self):
+        from agents.telemetry import events
+        attempts=[]; session=uuid.uuid4().hex
+        def handler(req):
+            attempts.append(json.loads(req.content))
+            if len(attempts)==1:
+                return httpx.Response(200,json={'choices':[{'finish_reason':'length','message':{'content':'','reasoning_content':'PRIVATE REASONING'}}],'usage':{'completion_tokens':700}})
+            return success()
+        await self.call(handler,session=session)
+        self.assertEqual([x['max_tokens'] for x in attempts],[2048,4096])
+        self.assertGreater(quota_usage(session),2048+4096)
+        failures=[e for e in events(kind='failure') if e['session']==session]
+        self.assertEqual(failures[0]['error'],'output_truncated')
+        self.assertEqual(failures[0]['finish_reason'],'length')
+        self.assertNotIn('PRIVATE REASONING',json.dumps(failures))
+    async def test_recovery_cannot_bypass_request_budget(self):
+        attempts=[]
+        def handler(req):
+            attempts.append(req)
+            return httpx.Response(200,json={'choices':[{'finish_reason':'length','message':{'content':''}}]})
+        with self.assertRaisesRegex(LLMError,'budget_overflow'):
+            await self.call(handler,self.config(budget_tokens=4000))
+        self.assertEqual(len(attempts),1)
+    async def test_blank_json_response_retries_once(self):
+        attempts=[]
+        def handler(req):
+            attempts.append(req)
+            return httpx.Response(200,json={'choices':[{'finish_reason':'stop','message':{'content':'   '}}]})
+        with self.assertRaisesRegex(LLMError,'empty_response'): await self.call(handler)
+        self.assertEqual(len(attempts),2)
+    async def test_refusal_is_not_retried(self):
+        attempts=[]
+        def handler(req):
+            attempts.append(req)
+            return httpx.Response(200,json={'choices':[{'finish_reason':'content_filter','message':{'content':''}}]})
+        with self.assertRaisesRegex(LLMError,'model_refusal'): await self.call(handler)
+        self.assertEqual(len(attempts),1)
+    async def test_complete_fenced_json_is_validated(self):
+        value=await self.call(lambda req:httpx.Response(200,json={'choices':[{'message':{'content':'```json\n'+json.dumps(VALID)+'\n```'}}]}))
+        self.assertEqual(value.chief_complaint,'鼻痒')
+    async def test_sse_truncation_is_not_accepted_as_complete(self):
+        attempts=[]
+        def handler(req):
+            attempts.append(req)
+            reason='length' if len(attempts)==1 else 'stop'
+            wire='data: '+json.dumps({'choices':[{'delta':{'content':json.dumps(VALID)},'finish_reason':reason}]})+'\n\ndata: [DONE]\n\n'
+            return httpx.Response(200,text=wire)
+        await self.call(handler,stream=True)
+        self.assertEqual(len(attempts),2)
     async def test_retry_429(self):
         attempts=[]
         def handler(req):
@@ -71,7 +132,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         self.assertGreater(quota_usage(session),0)
         with self.assertRaisesRegex(LLMError,'local_rate_limit'): await self.call(lambda req:success(),cfg,session=session)
     async def test_empty_stream(self):
-        with self.assertRaisesRegex(LLMError,'parse_failure'): await self.call(lambda req:httpx.Response(200,text='data: [DONE]\n\n'),stream=True)
+        with self.assertRaisesRegex(LLMError,'empty_response'): await self.call(lambda req:httpx.Response(200,text='data: [DONE]\n\n'),stream=True)
     async def test_network_error(self):
         def handler(req): raise httpx.ConnectError('offline',request=req)
         with self.assertRaisesRegex(LLMError,'network_error'): await self.call(handler)

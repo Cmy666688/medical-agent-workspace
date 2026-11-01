@@ -61,7 +61,7 @@ else:
     st.subheader('失败事件')
     explicit=frame[frame.kind=='failure'].copy()
     if len(explicit):
-        mapping={'timeout':'超时','rate_limit':'供应商限流','local_rate_limit':'本地限流','parse_failure':'解析失败','budget_overflow':'单请求预算溢出','session_budget_overflow':'累计预算溢出'}
+        mapping={'timeout':'超时','rate_limit':'供应商限流','local_rate_limit':'本地限流','parse_failure':'字段校验失败','output_truncated':'模型输出被截断','empty_response':'模型返回空答案','model_refusal':'模型未提供答案','budget_overflow':'单请求预算溢出','session_budget_overflow':'累计预算溢出'}
         explicit['失败类型']=explicit.error.map(mapping).fillna(explicit.error)
         st.dataframe(explicit.groupby('失败类型').size().rename('事件数').reset_index(),hide_index=True)
     st.dataframe(failures.dropna(axis=1,how='all'),hide_index=True)

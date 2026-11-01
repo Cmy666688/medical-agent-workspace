@@ -1,4 +1,4 @@
-import os,tempfile,unittest
+import asyncio,os,tempfile,unittest
 from unittest.mock import patch
 from pathlib import Path
 runtime=Path(tempfile.mkdtemp(prefix='risk_results_',dir='runtime'))
@@ -50,7 +50,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         def forbidden(cfg): self.fail('Urgent rule must not wait for remote service')
         result=await assess('胸口压榨伴大汗',LLMConfig(api_key='synthetic'),'test-risk',forbidden)
         self.assertEqual(result.output['online_status'],'skipped_urgent')
-    def test_page_displays_new_submission_and_model_failure(self):
+    def test_page_displays_submission_and_distinguishes_online_failure(self):
         app=AppTest.from_file('app.py',default_timeout=40)
         app.session_state.personal_token=accounts.register('risk_user','Risk-password-123','风险结果验证')['token']
         app.session_state.api_key=''
@@ -62,5 +62,19 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any('两周' in x.value for x in app.markdown))
         self.assertFalse(any('最近一次协作结果'==x.label for x in app.expander))
         self.assertFalse(app.json)
+        result=asyncio.run(assess(QUESTION,LLMConfig(),'test-ui-local'))
+        result.output.update(online_status='failed',review_error='output_truncated')
+        with patch('agents.risk_workflow.assess',return_value=result):
+            app.form('risk_test').form_submit_button[0].click().run()
+        self.assertFalse(app.exception,[x.message for x in app.exception])
+        self.assertTrue(any('本地检查已完成；在线复核失败' in x.value for x in app.warning))
+        self.assertFalse(app.success)
+        self.assertTrue(any('输出长度上限' in x.value for x in app.warning))
+        result.output.update(online_status='completed',model_review=dict(summary='格式验证完成',followup=[],limitations=[]))
+        with patch('agents.risk_workflow.assess',return_value=result):
+            app.form('risk_test').form_submit_button[0].click().run()
+        self.assertFalse(app.exception,[x.message for x in app.exception])
+        self.assertTrue(any('本地检查和在线复核均已完成' in x.value for x in app.success))
+        self.assertTrue(any('格式验证完成' in x.value for x in app.markdown))
 
 if __name__=='__main__': unittest.main(verbosity=2)
