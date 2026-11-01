@@ -72,7 +72,7 @@ class Tests(unittest.TestCase):
         async def fake(system,payload,schema,*args,**kwargs):
             if schema is ConsultationSummary: return ConsultationSummary(chief_complaint='测试',symptoms=[],followup=[])
             if schema is Ranking: return Ranking(ordered_source_ids=['two','one'])
-            if schema is SpecialistReview: return SpecialistReview(summary='仅为测试复核',source_ids=['two'],followup=['请补充'],limitations=['测试内容'])
+            if schema is SpecialistReview: return SpecialistReview(summary='仅为测试复核',source_ids=[row['doc_id'] for row in payload.get('evidence',[])][:1],followup=['请补充'],limitations=['测试内容'])
             return EvidenceSummary(summary='测试汇总',source_ids=['two'],limitations=[])
         async def run():
             events=[]

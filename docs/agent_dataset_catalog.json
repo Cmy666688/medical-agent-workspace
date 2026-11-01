@@ -11,7 +11,8 @@
       "status": "downloaded_sample",
       "local": "data/external/openfda",
       "verified_records": 15,
-      "public_app_imported": false
+      "public_app_imported": true,
+      "integration": "Local read-only medication index; limited source matching, not clinical validation"
     },
     {
       "id": "ddinter2_A",
@@ -23,7 +24,8 @@
       "local": "data/external/ddinter2/code_A.csv",
       "verified_rows": 56367,
       "contains_mechanism_text": false,
-      "public_app_imported": false
+      "public_app_imported": true,
+      "integration": "Local read-only medication index; limited source matching, not clinical validation"
     },
     {
       "id": "mimic_iv_ed_demo_2_2",
@@ -123,7 +125,8 @@
         "包裝與國際條碼"
       ],
       "language": "zh-Hant",
-      "public_app_imported": false
+      "public_app_imported": true,
+      "integration": "Local read-only medication index; limited source matching, not clinical validation"
     },
     {
       "id": "tfda_labels_and_packages",
@@ -141,7 +144,8 @@
         "外盒圖檔連結"
       ],
       "language": "zh-Hant",
-      "public_app_imported": false
+      "public_app_imported": true,
+      "integration": "Local read-only medication index; limited source matching, not clinical validation"
     },
     {
       "id": "tfda_appearance",
@@ -166,7 +170,8 @@
         "外觀圖檔連結"
       ],
       "language": "zh-Hant",
-      "public_app_imported": false
+      "public_app_imported": true,
+      "integration": "Local read-only medication index; limited source matching, not clinical validation"
     }
   ]
 }

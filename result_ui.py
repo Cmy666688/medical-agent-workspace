@@ -44,10 +44,8 @@ def render_output(agent,output):
         if output.get('retrieval_status')=='failed': st.warning('相关资料检索暂不可用，已保留风险检查和用药信息核对结果。')
         st.caption('规则检查和模型复核均不构成临床风险评分或诊断。')
     elif 'current_medications' in output:
-        st.write('当前用药：'+(output['current_medications'] or '尚未提供'))
-        st.write('药物过敏史：'+(output.get('allergies') or '尚未提供'))
-        if output.get('missing'): st.warning('请补充：'+'、'.join(output['missing']))
-        st.info(output.get('recommendation','用药信息需要进一步核实。'))
+        from medication_ui import medication_output
+        medication_output(output)
     elif 'evidences' in output:
         from ui import evidence_cards
         st.write(f"找到 {len(output['evidences'])} 条资料")

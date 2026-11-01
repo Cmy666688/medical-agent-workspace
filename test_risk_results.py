@@ -77,7 +77,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
             def search(self,q): return dict(evidences=[dict(EVIDENCE)],latency_ms=1,cache_hit=False)
         async def fake(system,payload,schema,*args,**kw):
             self.assertTrue(payload.get('risk_alert',payload.get('consultation',{}).get('risk_alert'))['red_flags'])
-            if schema is SpecialistReview: return SpecialistReview(summary='测试复核',source_ids=['synthetic-source'],followup=[],limitations=[])
+            if schema is SpecialistReview: return SpecialistReview(summary='测试复核',source_ids=[row['doc_id'] for row in payload.get('evidence',[])][:1],followup=[],limitations=[])
             self.assertIs(schema,EvidenceSummary)
             return EvidenceSummary(summary='测试在线资料整理',source_ids=['synthetic-source'],limitations=[])
         with patch('agents.coordinator.LLMClient.structured',side_effect=fake):

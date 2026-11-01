@@ -12,3 +12,4 @@ pandas==2.3.3
 Pillow==11.2.1
 pydantic==2.13.4
 pypdf>=5,<7
+opencc-python-reimplemented==0.1.7

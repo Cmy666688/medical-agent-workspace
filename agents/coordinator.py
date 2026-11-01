@@ -58,8 +58,8 @@ class MedicationAgent(BaseAgent):
     name = '用药 Agent'
     def execute(self, consultation):
         c = consultation['context']
-        missing = [name for key,name in [('allergies','过敏史'),('medications','当前用药')] if not c.get(key)]
-        return dict(status='需人工核实', missing=missing, allergies=c.get('allergies',''), current_medications=c.get('medications',''), recommendation='当前未接入经过验证的药品与相互作用数据库，不生成处方或剂量。请由医生或药师核对用药。', mode='资料完整性检查')
+        from .medication_knowledge import DrugKnowledge
+        return DrugKnowledge().check(c.get('medications',''),c.get('allergies',''))
 
 class EducationAgent(BaseAgent):
     name = '资料解读 Agent'
@@ -137,7 +137,11 @@ class Coordinator:
                     for role in ('风险复核 Agent','用药复核 Agent'):
                         tick=time.perf_counter(); notify(role,'执行中')
                         try:
-                            output=await review(llm,role,consultation.output,evidence,session,request)
+                            review_evidence=medication.output.get('drug_evidences',[]) if role=='用药复核 Agent' else evidence
+                            review_context=dict(consultation.output)
+                            if role=='用药复核 Agent':
+                                review_context['medication_findings']=dict(interactions=medication.output.get('interactions',[]),duplicates=medication.output.get('duplicates',[]),coverage=medication.output.get('knowledge_info',{}).get('coverage',{}))
+                            output=await review(llm,role,review_context,review_evidence,session,request)
                             trace.append(AgentResult(role,'完成',(time.perf_counter()-tick)*1000,output))
                             if role=='风险复核 Agent': risk.output.update(model_review=output,online_status='completed')
                         except LLMError as exc:
@@ -158,6 +162,11 @@ class Coordinator:
         if consultation.output['followup']:
             answer += '\n\n可补充的问诊信息'+('（不必等待补充或回复再就医）' if urgent else '')+'：\n' + '\n'.join('- '+x for x in consultation.output['followup'])
         answer += '\n\n用药信息核对：'+('已提供当前用药。' if context.get('medications') else '尚未提供当前用药。')+('已提供过敏史。' if context.get('allergies') else '尚未提供过敏史。')+'需要医生或药师核实；系统不生成处方或剂量。'
+        for pair in medication.output.get('interactions',[]):
+            if pair['records']:
+                answer+='\n- '+' / '.join(pair['drugs'])+'：DDInter 记录等级 '+'、'.join(dict.fromkeys(row['level_label'] for row in pair['records']))+'；仅为现有资料匹配，需医生或药师核实。'
+            else: answer+='\n- '+' / '.join(pair['drugs'])+'：未完成相互作用确认；当前子集未覆盖或药名尚未识别，不代表安全。'
+        if medication.output.get('duplicates'): answer+='\n- 检测到输入药名涉及重复成分，请核对是否为同一用药或复方重复。'
         if llm and evidence:
             llm_start=time.perf_counter()
             try:

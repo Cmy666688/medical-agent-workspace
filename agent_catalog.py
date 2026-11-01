@@ -2,7 +2,7 @@
 AGENTS = {
     'consultation': dict(name='问诊 Agent',icon='clinical_notes',page='agent_consultation',role='多轮问诊，协同风险评估、检索、用药核对与资料解读',input='症状描述、照片、个人情况和会话历史',output='问诊追问、风险提示、相关资料和原文依据',scope='本地规则与知识库协作；配置模型后可进行结构化提取和资料解读。'),
     'retrieval': dict(name='检索 Agent',icon='travel_explore',page='agent_retrieval',role='查找可引用的医疗资料',input='问诊问题或疾病名称',output='疾病资料、相关性分数和原始记录 ID',scope='已接入 BGE 与 Milvus；当前是向量检索，尚无精排或指南文献库。'),
-    'medication': dict(name='用药 Agent',icon='medication',page='agent_medication',role='核对用药相关信息',input='药物过敏史、当前用药',output='信息缺项及需人工核实事项',scope='当前仅检查信息完整性，尚未实现药物相互作用、禁忌或处方推荐。'),
+    'medication': dict(name='用药 Agent',icon='medication',page='agent_medication',role='核对药名、标签原文与已有相互作用记录',input='准确药名或许可证号、药物过敏史，也可拍照核对包装文字',output='TFDA 许可候选、openFDA 标签摘录、DDInter 药物对等级和未覆盖项',scope='使用有来源的有限数据子集；模糊药名需确认，不生成剂量、处方或完整安全结论。'),
     'risk': dict(name='风险评估 Agent',icon='health_and_safety',page='agent_risk',role='优先提示危险信号，结合相关资料整理风险信息',input='症状描述、问诊上下文与用药信息',output='危险信号、已知信息、待补充问题、参考资料与用药核对',scope='风险提醒先展示，资料检索继续进行；当前为关键词检查及可选模型复核，不构成临床风险评分。'),
     'vision': dict(name='视觉观察 Agent',icon='photo_camera',page='agent_vision',role='拍照或上传图片，整理可见特征',input='照片与观察问题',output='外观特征、可辨认文字及局限',scope='需配置视觉模型，不直接诊断。'),
     'family': dict(name='家庭协作 Agent',icon='family_restroom',page='agent_family',role='创建家庭、管理授权与组内交流',input='成员访问密钥、共享授权与留言',output='家庭成员、共享范围与留言板',scope='成员密钥验证；健康共享由本人逐项授权。'),
