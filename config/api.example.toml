@@ -1,0 +1,27 @@
+# Copy to api.local.toml. Fill IDs exactly as shown by your provider.
+# api.local.toml is private and ignored by version control. No API is called until an action is submitted.
+[llm]
+base_url = ""
+api_key = ""
+model = ""
+# json_schema (strict structured output) or json_object (JSON mode, validated locally)
+response_format = "json_schema"
+vision_model = ""
+# Empty vision URL/key inherit the text endpoint/key.
+vision_url = ""
+vision_key = ""
+vision_fallback_model = ""
+fallback_url = ""
+fallback_key = ""
+fallback_model = ""
+budget_tokens = 24000
+session_tokens = 200000
+calls_per_minute = 30
+input_price = 0.0
+output_price = 0.0
+fallback_input_price = 0.0
+fallback_output_price = 0.0
+vision_input_price = 0.0
+vision_output_price = 0.0
+enable_rerank = true
+enable_specialist_review = true

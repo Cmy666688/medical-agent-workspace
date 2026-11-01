@@ -1,0 +1,22 @@
+name: Offline checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install offline test dependencies
+        run: python -m pip install streamlit==1.66.1 langchain-core==1.7.3 httpx==0.28.1 pydantic==2.13.4 numpy==2.2.6 pandas==2.3.3 Pillow==11.2.1
+      - name: Compile source
+        run: python -m compileall -q agents app_pages *.py
+      - name: Test account and family isolation
+        run: |
+          mkdir -p runtime
+          python -m unittest test_accounts test_family test_family_extensions test_identity_product test_conversations
+      - name: Test API contracts with synthetic responses
+        run: python -m unittest test_llm_engineering test_vision_monitor test_project_completion

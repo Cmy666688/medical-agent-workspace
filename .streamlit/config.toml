@@ -1,0 +1,45 @@
+[server]
+headless = true
+address = "127.0.0.1"
+folderWatchBlacklist = [".venv", "runtime", "runs", "data"]
+
+[browser]
+gatherUsageStats = false
+
+[client]
+toolbarMode = "minimal"
+
+[theme]
+base = "light"
+primaryColor = "#1D5C48"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F3F6F4"
+textColor = "#243A32"
+borderColor = "#E1E8E3"
+font = "sans-serif"
+baseFontSize = 15
+baseRadius = "1rem"
+buttonRadius = "0.75rem"
+headingFontSizes = ["36px", "25px", "20px", "17px", "15px", "14px"]
+headingFontWeights = [600, 600, 600, 600, 600, 600]
+metricValueFontSize = "30px"
+metricValueFontWeight = 600
+greenColor = "#2B7454"
+greenBackgroundColor = "#E7F2E9"
+greenTextColor = "#23513A"
+blueColor = "#527487"
+blueBackgroundColor = "#EBF1F5"
+blueTextColor = "#375365"
+chartCategoricalColors = ["#1D5C48", "#729C8A", "#C5AC79", "#6E8DA1"]
+showSidebarBorder = true
+paddingTop = "2rem"
+paddingBottom = "2.5rem"
+
+[theme.sidebar]
+backgroundColor = "#F5F7F5"
+secondaryBackgroundColor = "#E8EEE8"
+textColor = "#384D43"
+borderColor = "#E1E8E3"
+primaryColor = "#1D5C48"
+linkColor = "#245B47"
+paddingTop = "1rem"
