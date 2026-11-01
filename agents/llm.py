@@ -57,6 +57,8 @@ def reserve(session, tokens, config):
     # 网络调用前原子预留；失败也保留上界，防止未知用量绕过预算。
     with connect() as db:
         db.execute('BEGIN IMMEDIATE')
+        from public_policy import public_mode,reserve_public
+        if public_mode(): reserve_public(db,session,tokens)
         total=db.execute('SELECT COALESCE(SUM(tokens),0) FROM quota WHERE session=?',(session,)).fetchone()[0]
         count=db.execute('SELECT COUNT(*) FROM quota WHERE session=? AND time>?',(session,time.time()-60)).fetchone()[0]
         if total+tokens>config.session_tokens: raise LLMError('session_budget_overflow')

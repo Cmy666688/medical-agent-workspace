@@ -20,3 +20,5 @@ jobs:
           python -m unittest test_accounts test_family test_family_extensions test_identity_product test_conversations
       - name: Test API contracts with synthetic responses
         run: python -m unittest test_llm_engineering test_vision_monitor test_project_completion test_risk_results
+      - name: Test public deployment isolation and limits
+        run: python test_public_deployment.py

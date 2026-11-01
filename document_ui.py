@@ -3,6 +3,10 @@ from ui import document_jobs
 from agents.documents import read_upload,DocumentStore
 
 def document_panel():
+    from public_policy import public_mode
+    if public_mode():
+        st.caption('共享参考库由服务管理者维护。')
+        return
     with st.expander('添加参考资料 / 增量索引',icon=':material/library_add:'):
         st.caption('支持 UTF-8 文本、Markdown 和带文字层的 PDF。资料按页切片，更新同名文件会原子替换旧版本；不重新训练模型或覆盖原疾病库。')
         photo=st.file_uploader('选择参考资料',type=['txt','md','pdf'],max_upload_size=5,key='knowledge_document')

@@ -8,6 +8,26 @@ GitHub 托管源码。这个项目是 Python/Streamlit 后端应用，不能通�
 
 ## 基本启动
 
+### 本机 HTTPS 公网入口（Windows）
+
+安装官方 `cloudflared` 后，双击根目录“启动公网入口.cmd”，或执行：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\start_public.ps1
+```
+
+启动器在后台管理三个独立进程：127.0.0.1:8503 的 Streamlit 公网实例、该实例的提醒工作进程和 Cloudflare Quick Tunnel。窗口会显示 HTTPS 地址并打开登录页；重复启动会复用仍在运行的入口。现有 8502 本机工作台继续运行。
+
+公网账号、家庭、对话、提醒、监控和补充参考库保存在被 Git 忽略的 `runtime/public/`，不复制本机已有用户数据。首次访问公网入口需要重新注册。疾病知识库及 BGE 权重继续使用本机已经准备的资料；API 由服务端读取 `config/api.local.toml`，不会公开上传。公网访客无法编辑模型服务地址、查看全站监控、启用开发数据或上传共享索引资料。
+
+公网模型调用额外受持久化每日预留额度控制，默认全站 2,000,000 token、每账号 200,000 token；可用 `MEDICAL_PUBLIC_DAILY_TOKENS` 和 `MEDICAL_PUBLIC_USER_TOKENS` 在启动前调整。预留额度是上界，失败也保留预留，不能用新建对话重置每日限制。既有单请求/会话/分钟限制仍生效。
+
+停止时双击“停止公网入口.cmd”，或执行 `stop_public.ps1`。只关闭已核验的公网进程，保留数据和本机 8502 服务。当前公网地址保存在 `runtime/public/hosting.json`；重建隧道后域名会变化。电脑关机、休眠或网络断开时入口无法使用；这不是长期托管。
+
+Quick Tunnel 是临时演示服务，没有可用性保证，最多 200 个并发请求；固定域名与长期服务需要命名隧道或云服务器。Streamlit 浏览器通信使用 WebSocket；服务端到模型供应商的 SSE 不经过访客隧道。来源：[Cloudflare Quick Tunnels](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/)。
+
+### 常规 Python 环境
+
 建议使用 Python 3.13。在项目根目录建立虚拟环境并安装依赖：
 
 ```bash
