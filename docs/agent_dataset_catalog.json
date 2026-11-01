@@ -1,0 +1,172 @@
+{
+  "checked_on": "2026-11-01",
+  "checked_timezone": "Asia/Shanghai",
+  "datasets": [
+    {
+      "id": "openfda_labels",
+      "agent": "medication",
+      "source": "https://open.fda.gov/apis/drug/label/",
+      "terms": "https://open.fda.gov/terms/",
+      "license": "CC0 default; third-party exceptions",
+      "status": "downloaded_sample",
+      "local": "data/external/openfda",
+      "verified_records": 15,
+      "public_app_imported": false
+    },
+    {
+      "id": "ddinter2_A",
+      "agent": "medication",
+      "source": "https://ddinter2.scbdd.com/download/",
+      "terms": "https://ddinter2.scbdd.com/terms/",
+      "license": "CC-BY-NC-SA-4.0",
+      "status": "downloaded_subset",
+      "local": "data/external/ddinter2/code_A.csv",
+      "verified_rows": 56367,
+      "contains_mechanism_text": false,
+      "public_app_imported": false
+    },
+    {
+      "id": "mimic_iv_ed_demo_2_2",
+      "agent": "risk",
+      "source": "https://physionet.org/content/mimic-iv-ed-demo/2.2/",
+      "license": "ODbL-1.0",
+      "status": "downloaded_demo",
+      "local": "data/external/mimic_iv_ed_demo",
+      "triage_rows": 222,
+      "unique_subjects_in_triage": 64,
+      "missing_acuity": 15,
+      "publisher_checksums_verified": true,
+      "public_app_imported": false
+    },
+    {
+      "id": "uci_heart_cleveland",
+      "agent": "risk",
+      "source": "https://archive.ics.uci.edu/dataset/45/heart+disease",
+      "license": "CC-BY-4.0",
+      "status": "downloaded_archive",
+      "local": "data/external/uci_heart/heart_disease.zip",
+      "verified_rows": 303,
+      "target": "Existing disease classification; not future event probability",
+      "public_app_imported": false
+    },
+    {
+      "id": "nhanes_2021_2023_bp",
+      "agent": "risk/family",
+      "source": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2021/DataFiles/BPXO_L.htm",
+      "license": "CDC public-use data; follow official use and analytic documentation",
+      "status": "downloaded_tables",
+      "local": "data/external/nhanes",
+      "blood_pressure_rows": 7801,
+      "demographics_rows": 11933,
+      "public_app_imported": false
+    },
+    {
+      "id": "imcs21",
+      "agent": "consultation",
+      "source": "https://github.com/lemuria-wchen/imcs21",
+      "license": "Not confirmed for data; review before use",
+      "status": "publisher_documentation_verified_not_downloaded",
+      "public_app_imported": false
+    },
+    {
+      "id": "cmedqa2",
+      "agent": "consultation",
+      "source": "https://github.com/zhangsheng93/cMedQA2",
+      "license": "README non-commercial research; LICENSE GPL-3.0; scope needs clarification",
+      "status": "publisher_documentation_verified_not_downloaded",
+      "public_app_imported": false
+    },
+    {
+      "id": "mimic_iv_ed_full",
+      "agent": "risk",
+      "source": "https://physionet.org/content/mimic-iv-ed/2.2/",
+      "license": "PhysioNet credentialed license and DUA",
+      "status": "requires_credentials_training_and_DUA",
+      "public_app_imported": false
+    },
+    {
+      "id": "tfda_drug_licenses",
+      "agent": "medication",
+      "source": "https://data.gov.tw/dataset/9122",
+      "license": "Government Data Open License Taiwan version 1.0",
+      "status": "downloaded_and_json_parsed",
+      "local": "data/external/tfda/drug_licenses.json.zip",
+      "verified_rows": 72096,
+      "columns": [
+        "許可證字號",
+        "註銷狀態",
+        "註銷日期",
+        "註銷理由",
+        "有效日期",
+        "發證日期",
+        "許可證種類",
+        "舊證字號",
+        "通關簽審文件編號",
+        "中文品名",
+        "英文品名",
+        "適應症",
+        "劑型",
+        "包裝",
+        "藥品類別",
+        "管制藥品分類級別",
+        "主成分略述",
+        "申請商名稱",
+        "申請商地址",
+        "申請商統一編號",
+        "製造商名稱",
+        "製造廠廠址",
+        "製造廠公司地址",
+        "製造廠國別",
+        "製程",
+        "異動日期",
+        "用法用量",
+        "包裝與國際條碼"
+      ],
+      "language": "zh-Hant",
+      "public_app_imported": false
+    },
+    {
+      "id": "tfda_labels_and_packages",
+      "agent": "medication/education/vision",
+      "source": "https://data.gov.tw/dataset/9117",
+      "license": "Government Data Open License Taiwan version 1.0",
+      "status": "downloaded_and_json_parsed",
+      "local": "data/external/tfda/labels_and_packages.json.zip",
+      "verified_rows": 29903,
+      "columns": [
+        "許可證字號",
+        "中文品名",
+        "英文品名",
+        "仿單圖檔連結",
+        "外盒圖檔連結"
+      ],
+      "language": "zh-Hant",
+      "public_app_imported": false
+    },
+    {
+      "id": "tfda_appearance",
+      "agent": "vision",
+      "source": "https://data.gov.tw/dataset/9120",
+      "license": "Government Data Open License Taiwan version 1.0",
+      "status": "downloaded_and_json_parsed",
+      "local": "data/external/tfda/appearance.json.zip",
+      "verified_rows": 6362,
+      "columns": [
+        "許可證字號",
+        "中文品名",
+        "英文品名",
+        "形狀",
+        "特殊劑型",
+        "顏色",
+        "特殊氣味",
+        "刻痕",
+        "外觀尺寸",
+        "標註一",
+        "標註二",
+        "外觀圖檔連結"
+      ],
+      "language": "zh-Hant",
+      "public_app_imported": false
+    }
+  ]
+}
