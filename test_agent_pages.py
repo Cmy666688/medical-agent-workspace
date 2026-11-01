@@ -10,6 +10,7 @@ from agents import accounts
 app=AppTest.from_file('app.py',default_timeout=30)
 app.session_state.personal_token=accounts.register('agent_test','Agent-password-123','功能验证用户')['token']
 app.session_state.api_key=''
+app.session_state.risk_include_references=False
 app.run()
 assert not app.exception
 assert sum(x.label=='打开功能' for x in app.get('page_link'))==5
@@ -31,6 +32,7 @@ app.text_area[0].set_value('这是资料整理功能的测试正文。').run()
 next(x for x in app.button if x.label=='整理资料与来源').click().run()
 assert not app.exception
 assert app.session_state.agent_tests['education']['output']['points'][0]['excerpt']=='这是资料整理功能的测试正文。'
+app.session_state.risk_include_references=False
 app.switch_page('app_pages/agent_risk.py').run()
 app.text_area[0].set_value('胸口压榨伴大汗')
 app.form_submit_button[0].click().run()

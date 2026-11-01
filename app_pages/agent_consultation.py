@@ -64,13 +64,16 @@ if question:
         question=question+'\n'+st.session_state.pop('vision_handoff')
     with st.chat_message('user'): st.write(question)
     try:
+        risk_notice=st.empty()
         with st.status('正在整理问诊信息、检查危险信号并检索资料…',expanded=True) as status:
             progress=st.empty(); states={}
             def show_progress(event):
+                if event.get('output',{}).get('red_flags'):
+                    risk_notice.warning(event['output']['recommendation']+' 相关资料将继续加载，请勿等待结果再就医。')
                 states[event['agent']]=event['status']
                 with progress.container():
                     for name,state in states.items(): st.write(name+' · '+state)
-            result=asyncio.run(Coordinator(retrieval()).run(question,conversation_context,st.session_state.history,active_session,llm_config(),on_event=show_progress))
+            result=asyncio.run(Coordinator(retrieval).run(question,conversation_context,st.session_state.history,active_session,llm_config(),on_event=show_progress))
             for x in result['trace']: st.write(f"{x['agent']} · {x['status']} · {x['duration_ms']:.0f} ms")
             status.update(label='协作完成',state='complete')
         turn=dict(question=question,**result)

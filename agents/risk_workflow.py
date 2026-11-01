@@ -1,5 +1,5 @@
 """Readable risk information collection and optional evidence-constrained model review."""
-import re,time
+import asyncio,copy,re,time
 from .llm import LLMClient,LLMError
 from .specialists import review
 
@@ -31,16 +31,32 @@ def information(text):
     else: followup.append('是否还有其他伴随症状？没有也请说明。')
     return dict(provided_info=provided,followup=followup,reported_symptoms=present,denied_symptoms=denied,input_snapshot=text)
 
-async def assess(question,config,session,client_factory=LLMClient):
-    from .coordinator import RiskAgent
+async def assess(question,config,session,client_factory=LLMClient,retrieval=None,context=None,on_event=None):
+    from .coordinator import RiskAgent,MedicationAgent,EducationAgent,Coordinator
     started=time.perf_counter()
     result=await RiskAgent().run(dict(query=question))
+    if on_event: on_event(dict(agent='风险评估 Agent',status=result.status,output=copy.deepcopy(result.output)))
+    evidence=[]
+    if result.status=='完成' and retrieval is not None:
+        request='risk-'+str(time.time_ns())
+        consultation=dict(query=question,context=context or {},risk_alert=dict(red_flags=result.output['red_flags'],recommendation=result.output['recommendation']))
+        tick=time.perf_counter()
+        found,medication=await asyncio.gather(asyncio.to_thread(Coordinator(retrieval).search,question),MedicationAgent().run(consultation),return_exceptions=True)
+        if not isinstance(medication,Exception): result.output['medication_check']=medication.output
+        if isinstance(found,Exception): result.output.update(retrieval_status='failed',retrieval_error=type(found).__name__)
+        else:
+            from .telemetry import record
+            evidence=found['evidences']
+            result.output.update(retrieval_status='completed' if evidence else 'no_hit',evidences=evidence)
+            record(session,request,'retrieval',latency_ms=found.get('latency_ms',(time.perf_counter()-tick)*1000),no_hit=not evidence,cache_hit=found.get('cache_hit',False))
+            education=await EducationAgent().run(evidence)
+            result.output['education']=education.output
     result.output['online_status']='not_requested'
     if result.status!='完成' or result.output.get('red_flags'):
         result.output['online_status']='skipped_urgent' if result.output.get('red_flags') else 'not_requested'
     elif config.api_key:
         try:
-            value=await review(client_factory(config),'风险复核 Agent',dict(query=question,known_information=result.output['provided_info'],missing_information=result.output['followup']),[],session,'risk-'+str(time.time_ns()))
+            value=await review(client_factory(config),'风险复核 Agent',dict(query=question,known_information=result.output['provided_info'],missing_information=result.output['followup']),evidence,session,'risk-'+str(time.time_ns()))
             result.output.update(online_status='completed',model_review=value)
         except LLMError as exc: result.output.update(online_status='failed',review_error=str(exc))
     else: result.output['online_status']='not_configured'

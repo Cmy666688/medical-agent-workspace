@@ -40,7 +40,8 @@ def llm_config():
 
 def evidence_cards(evidences):
     for i,r in enumerate(evidences,1):
-        with st.expander(f"[{i}] {r['name']} · 相关性 {r['score']:.3f}",icon=':material/article:'):
-            st.caption(f"来源：{r['source']} · 记录 ID：{r['doc_id']}")
-            st.write('症状：'+'、'.join(r['symptoms']))
+        score=f" · 相关性 {r['score']:.3f}" if isinstance(r.get('score'),(int,float)) else ''
+        with st.expander(f"[{i}] {r['name']}"+score,icon=':material/article:'):
+            st.caption(f"来源：{r.get('source','知识库')} · 记录 ID：{r['doc_id']}")
+            if r.get('symptoms'): st.write('症状：'+'、'.join(r['symptoms']))
             st.write(r['content'])

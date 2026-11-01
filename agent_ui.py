@@ -1,5 +1,6 @@
 """Agent 的公开说明与会话执行状态；不生成模拟执行结果。"""
 import streamlit as st
+import copy
 import uuid
 from agents.telemetry import record
 
@@ -36,7 +37,7 @@ def agent_header(key,show_recent=True):
         st.stop()
     st.caption('健康助手 / '+meta['name'])
     item=latest(meta['name'])
-    if not show_recent: item=st.session_state.get('agent_tests',{}).get(key)
+    if not show_recent: item=st.session_state.get('agent_tests',{}).get(key) or item
     title,status=st.columns([4,1],vertical_alignment='center')
     title.title(meta['name'],icon=f":material/{meta['icon']}:")
     partial=bool(item and item.get('output',{}).get('online_status')=='failed')
@@ -57,7 +58,7 @@ def agent_header(key,show_recent=True):
     st.page_link('app_pages/agent_consultation.py',label='需要完整问诊？前往问诊 Agent',icon=':material/arrow_forward:')
 
 def save_test(key, result):
-    st.session_state.setdefault('agent_tests',{})[key]=result
+    st.session_state.setdefault('agent_tests',{})[key]=copy.deepcopy(result)
     request=uuid.uuid4().hex[:12]
     name=AGENTS[key]['name']
     duration=result.get('duration_ms',result.get('latency_ms',0))

@@ -32,6 +32,15 @@ def render_output(agent,output):
         if output.get('online_status')=='failed': st.warning('在线复核未完成，已保留本地结果。'+friendly_error(output.get('review_error')))
         elif output.get('online_status')=='not_configured': st.caption('当前未配置文本模型，已显示本地信息整理与规则检查结果。')
         elif output.get('online_status')=='skipped_urgent': st.caption('危险信号提示优先，未等待在线模型复核。')
+        if output.get('medication_check'):
+            st.markdown('**用药信息核对**'); render_output('用药 Agent',output['medication_check'])
+        if output.get('evidences'):
+            from ui import evidence_cards
+            st.markdown('**相关参考资料与来源**')
+            st.caption('资料仅供查阅，不能据此降低风险提醒的优先级或自行用药。')
+            evidence_cards(output['evidences'])
+        elif output.get('retrieval_status')=='no_hit': st.info('没有找到相关资料；这不代表没有风险。')
+        if output.get('retrieval_status')=='failed': st.warning('相关资料检索暂不可用，已保留风险检查和用药信息核对结果。')
         st.caption('规则检查和模型复核均不构成临床风险评分或诊断。')
     elif 'current_medications' in output:
         st.write('当前用药：'+(output['current_medications'] or '尚未提供'))

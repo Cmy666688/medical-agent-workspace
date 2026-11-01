@@ -1,4 +1,5 @@
 import asyncio
+import copy
 import json
 import re
 import time
@@ -69,10 +70,15 @@ class Coordinator:
     def __init__(self, retrieval):
         self.retrieval = retrieval
 
+    def search(self, query):
+        service=self.retrieval() if callable(self.retrieval) else self.retrieval
+        if service is None: raise RuntimeError('retrieval_unavailable')
+        return service.search(query)
+
     async def run(self, question, context, history: InMemoryChatMessageHistory, session, config=None,on_event=None):
-        def notify(agent,status):
+        def notify(agent,status,**details):
             if on_event:
-                try: on_event(dict(agent=agent,status=status))
+                try: on_event(copy.deepcopy(dict(agent=agent,status=status,**details)))
                 except Exception: pass
         request = uuid.uuid4().hex[:12]; started = time.perf_counter(); trace=[]; conflicts=[]
         notify('问诊 Agent','执行中')
@@ -81,8 +87,10 @@ class Coordinator:
         if consultation.status == '失败': raise RuntimeError('问诊信息处理失败')
         notify('风险评估 Agent','执行中')
         risk = await RiskAgent().run(consultation.output); trace.append(risk)
-        notify('风险评估 Agent',risk.status)
+        notify('风险评估 Agent',risk.status,output=risk.output)
         if risk.status == '失败': raise RuntimeError('风险检查不可用，请稍后重试或线下咨询')
+        urgent=bool(risk.output['red_flags'])
+        consultation.output['risk_alert']=dict(red_flags=risk.output['red_flags'],recommendation=risk.output['recommendation'])
         llm = LLMClient(config) if config and config.api_key else None
         if llm and not risk.output['red_flags']:
             llm_start=time.perf_counter()
@@ -94,20 +102,27 @@ class Coordinator:
                 record(session,request,'failure',agent='问诊 LLM',error=str(exc))
                 trace.append(AgentResult('问诊 LLM','失败',(time.perf_counter()-llm_start)*1000,error=str(exc)))
         evidence = []
-        if risk.output['red_flags']:
-            conflicts.append('风险规则优先：中止检索和用药流程，先提示紧急就医。')
-            for name in ['检索 Agent','用药 Agent','资料解读 Agent']:
-                trace.append(AgentResult(name,'跳过',0,dict(reason='危险信号优先')))
+        if urgent:
+            conflicts.append('风险提醒已优先展示；继续提供相关资料与用药信息核对，不能据此延迟就医或自行用药。')
+        start = time.perf_counter()
+        notify('检索 Agent','执行中'); notify('用药 Agent','执行中')
+        retrieval, medication = await asyncio.gather(asyncio.to_thread(self.search, consultation.output['query']), MedicationAgent().run(consultation.output),return_exceptions=True)
+        if isinstance(medication,Exception):
+            medication=AgentResult('用药 Agent','失败',(time.perf_counter()-start)*1000,error=type(medication).__name__)
+        trace.append(medication); notify('用药 Agent',medication.status)
+        if medication.status=='完成': risk.output['medication_check']=medication.output
+        if isinstance(retrieval,Exception):
+            risk.output.update(retrieval_status='failed',retrieval_error=type(retrieval).__name__)
+            trace.append(AgentResult('检索 Agent','失败',(time.perf_counter()-start)*1000,error=type(retrieval).__name__))
+            notify('检索 Agent','失败')
         else:
             start = time.perf_counter()
             try:
-                notify('检索 Agent','执行中'); notify('用药 Agent','执行中')
-                retrieval, medication = await asyncio.gather(asyncio.to_thread(self.retrieval.search, consultation.output['query']), MedicationAgent().run(consultation.output))
                 evidence = retrieval['evidences']
-                notify('检索 Agent','完成'); notify('用药 Agent',medication.status)
+                notify('检索 Agent','完成')
                 trace.append(AgentResult('检索 Agent','完成',retrieval['latency_ms'],retrieval))
                 record(session,request,'retrieval', latency_ms=retrieval['latency_ms'],no_hit=not evidence,cache_hit=retrieval['cache_hit'])
-                trace.append(medication)
+                risk.output['retrieval_status']='completed' if evidence else 'no_hit'
                 if llm and config.enable_rerank and len(evidence)>1:
                     from .specialists import rerank
                     tick=time.perf_counter(); notify('检索重排 Agent','执行中')
@@ -124,26 +139,29 @@ class Coordinator:
                         try:
                             output=await review(llm,role,consultation.output,evidence,session,request)
                             trace.append(AgentResult(role,'完成',(time.perf_counter()-tick)*1000,output))
+                            if role=='风险复核 Agent': risk.output.update(model_review=output,online_status='completed')
                         except LLMError as exc:
                             trace.append(AgentResult(role,'失败',(time.perf_counter()-tick)*1000,error=str(exc)))
+                            if role=='风险复核 Agent': risk.output.update(online_status='failed',review_error=str(exc))
                         notify(role,trace[-1].status)
                 notify('资料解读 Agent','执行中')
                 trace.append(await EducationAgent().run(evidence))
                 notify('资料解读 Agent',trace[-1].status)
             except Exception as exc:
                 trace.append(AgentResult('检索 Agent','失败',(time.perf_counter()-start)*1000,error=type(exc).__name__))
+                risk.output.update(retrieval_status='failed',retrieval_error=type(exc).__name__)
+        risk.output['evidences']=evidence
         answer = risk.output['recommendation']
-        if not risk.output['red_flags']:
-            if evidence:
-                answer += '\n\n找到以下相关疾病资料，供查阅，不代表诊断：\n' + '\n'.join(f"- [{i}] {r['name']}：{r['content'][:160]}" for i,r in enumerate(evidence[:3],1))
-            else: answer += '\n\n本次没有可用的检索证据，无法据此判断疾病。'
-            if consultation.output['followup']:
-                answer += '\n\n为便于继续问诊，请补充：\n' + '\n'.join('- '+x for x in consultation.output['followup'])
-            answer += '\n\n用药信息需要医生或药师核实；系统不生成处方或剂量。'
-        if llm and not risk.output['red_flags'] and evidence:
+        if evidence:
+            answer += '\n\n相关资料（仅供查阅，不代表诊断）'+('，不能替代前述就医提醒' if urgent else '')+'：\n' + '\n'.join(f"- [{i}] {r['name']}：{r['content'][:160]}" for i,r in enumerate(evidence[:3],1))
+        else: answer += '\n\n'+('资料检索暂不可用，已保留风险提醒与用药信息核对。' if risk.output.get('retrieval_status')=='failed' else '本次没有找到相关资料，不代表没有风险或无需就医。')
+        if consultation.output['followup']:
+            answer += '\n\n可补充的问诊信息'+('（不必等待补充或回复再就医）' if urgent else '')+'：\n' + '\n'.join('- '+x for x in consultation.output['followup'])
+        answer += '\n\n用药信息核对：'+('已提供当前用药。' if context.get('medications') else '尚未提供当前用药。')+('已提供过敏史。' if context.get('allergies') else '尚未提供过敏史。')+'需要医生或药师核实；系统不生成处方或剂量。'
+        if llm and evidence:
             llm_start=time.perf_counter()
             try:
-                summary=await llm.structured('你是医疗资料解读助手。仅整理给定证据，source_ids 只能选输入中的 doc_id。不能诊断或给处方剂量；说明证据局限。',dict(question=question,evidence=[dict(doc_id=r['doc_id'],name=r['name'],content=r['content'][:600]) for r in evidence]),EvidenceSummary,session,request,'资料解读 Agent',stream=True)
+                summary=await llm.structured('你是医疗资料解读助手。仅整理给定证据，source_ids 只能选输入中的 doc_id。不能诊断或给处方剂量；说明证据局限。若存在 risk_alert 危险信号，不得降低其优先级、建议等待或以居家处理替代就医。',dict(question=question,risk_alert=consultation.output['risk_alert'],evidence=[dict(doc_id=r['doc_id'],name=r['name'],content=r['content'][:600]) for r in evidence]),EvidenceSummary,session,request,'资料解读 Agent',stream=True)
                 if not set(summary.source_ids).issubset({r['doc_id'] for r in evidence}):
                     raise LLMError('invalid_citation')
                 answer += '\n\n资料解读（AI 生成，需核对原文）：\n'+summary.summary
