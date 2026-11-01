@@ -9,6 +9,7 @@ from agents import accounts
 
 app=AppTest.from_file('app.py',default_timeout=30)
 app.session_state.personal_token=accounts.register('agent_test','Agent-password-123','功能验证用户')['token']
+app.session_state.api_key=''
 app.run()
 assert not app.exception
 assert sum(x.label=='打开功能' for x in app.get('page_link'))==5

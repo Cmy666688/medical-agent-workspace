@@ -29,13 +29,14 @@ def agent_overview():
             st.page_link('app_pages/'+meta['page']+'.py',label='打开功能',icon=':material/arrow_forward:',width='stretch')
     st.caption('问诊协作状态来自当前会话；家庭任务与共享权限在对应页面查看。')
 
-def agent_header(key):
+def agent_header(key,show_recent=True):
     meta=AGENTS.get(key)
     if meta is None:
         st.error("Agent 配置未加载，请刷新页面或重启服务。")
         st.stop()
     st.caption('健康助手 / '+meta['name'])
     item=latest(meta['name'])
+    if not show_recent: item=st.session_state.get('agent_tests',{}).get(key)
     title,status=st.columns([4,1],vertical_alignment='center')
     title.title(meta['name'],icon=f":material/{meta['icon']}:")
     with status: st.badge(item['status'] if item else '准备就绪',color='green' if not item or item['status']=='完成' else 'gray')
@@ -44,13 +45,14 @@ def agent_header(key):
         st.markdown('**你需要提供**　'+meta['input'])
         st.markdown('**你会得到**　'+meta['output'])
         st.caption(meta['scope'])
-    with st.expander('最近一次协作结果',expanded=False,icon=':material/history:'):
-        if item:
-            st.write(f"状态：{item['status']} · 耗时：{item['duration_ms']:.0f} ms")
-            if item['error']: st.warning(friendly_error(item['error']))
-            render_output(meta['name'],item['output'])
-            debug_output(item)
-        else: st.caption('当前会话还没有此 Agent 的调用结果。可以使用下面的功能，或前往问诊 Agent 发起完整问诊。')
+    if show_recent:
+        with st.expander('最近一次协作结果',expanded=False,icon=':material/history:'):
+            if item:
+                st.write(f"状态：{item['status']} · 耗时：{item['duration_ms']:.0f} ms")
+                if item['error']: st.warning(friendly_error(item['error']))
+                render_output(meta['name'],item['output'])
+                debug_output(item)
+            else: st.caption('当前会话还没有此 Agent 的调用结果。可以使用下面的功能，或前往问诊 Agent 发起完整问诊。')
     st.page_link('app_pages/agent_consultation.py',label='需要完整问诊？前往问诊 Agent',icon=':material/arrow_forward:')
 
 def save_test(key, result):

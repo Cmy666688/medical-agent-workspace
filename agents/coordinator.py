@@ -43,12 +43,15 @@ class RiskAgent(BaseAgent):
     name = '风险评估 Agent'
     def execute(self, consultation):
         text = consultation['query']
+        from .risk_workflow import information,is_denied
         patterns = ['呼吸困难','意识不清','意识改变','胸口压榨','胸痛','大汗','放射左臂','昏迷','呕血']
         flags = []
         for term in patterns:
-            if any(not re.search(r'(没有|无|否认|不伴|未出现)\s*$', text[max(0,m.start()-4):m.start()]) for m in re.finditer(term,text)):
+            if any(not is_denied(text,m.start()) for m in re.finditer(term,text)):
                 flags.append(term)
-        return dict(level='紧急提示' if flags else '信息不足，未能判定风险', red_flags=flags, recommendation='出现危险信号，请立即联系急救或就近急诊。中国大陆急救电话 120。' if flags else '请补充症状持续时间、严重程度和伴随症状；持续或加重时及时线下就医。', mode='保守关键词规则；未经过临床验证')
+        details=information(text)
+        recommendation='出现危险信号，请立即联系急救或就近急诊。中国大陆急救电话 120。' if flags else ('目前还缺少部分信息，见下方待补充问题。' if details['followup'] else '你提供的持续时间、程度和伴随情况已整理。已有规则未匹配到危险信号关键词，仍无法仅凭文字判断实际风险等级。')
+        return dict(level='紧急提示' if flags else '尚不能确定风险等级', red_flags=flags, recommendation=recommendation, mode='本地危险信号检查与信息整理',**details)
 
 class MedicationAgent(BaseAgent):
     name = '用药 Agent'
