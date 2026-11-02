@@ -8,7 +8,7 @@ def _clear_context():
     st.session_state.turns=[]
     st.session_state.agent_tests={}
     for key in list(st.session_state):
-        if key.startswith(('embedded_vision_','feedback_','saved_','consultation_context_')) or key in ('vision_result','vision_hash','vision_handoff'):
+        if key.startswith(('embedded_vision_','feedback_','saved_','consultation_context_','check_card_','coordinator_question_','coordinator_turn_')) or key in ('vision_result','vision_hash','vision_handoff','card_saved_notice','consultation_failure_notice','consultation_failed_timeline'):
             st.session_state.pop(key,None)
 
 def _context():

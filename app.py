@@ -20,7 +20,7 @@ if not profile or not profile.get('username'):
         if profile: account_panel()
         else: auth_panel()
     # Known feature URLs render the login view without loading protected page scripts.
-    routes=['home','conversations','knowledge','agent_consultation','agent_retrieval','agent_medication','agent_risk','agent_education','family_home','agent_family','agent_care','agent_schedule','monitor','evaluation']
+    routes=['home','coordinator','conversations','knowledge','agent_consultation','agent_retrieval','agent_medication','agent_risk','agent_education','family_home','agent_family','agent_care','agent_schedule','monitor','evaluation']
     public=[st.Page(locked_page,title='登录 / 注册',url_path='sign-in',default=True),st.Page('app_pages/account.py',title='登录 / 注册')]
     public.extend(st.Page(locked_page,title='登录 / 注册',url_path=route) for route in routes)
     page=st.navigation(public,position='hidden')
@@ -45,7 +45,7 @@ def workspace_redirect():
 
 navigation={
     '账户': [st.Page('app_pages/account.py',title='我的账户',icon=':material/account_circle:'),st.Page(workspace_redirect,title='工作台',url_path='sign-in',visibility='hidden')],
-    '工作台': [st.Page('app_pages/home.py',title='工作台概览',icon=':material/space_dashboard:',default=True),st.Page('app_pages/conversations.py',title='历史对话',icon=':material/history:'),st.Page('app_pages/knowledge.py',title='医疗知识库',icon=':material/menu_book:')],
+    '工作台': [st.Page('app_pages/home.py',title='工作台概览',icon=':material/space_dashboard:',default=True),st.Page('app_pages/coordinator.py',title='多智能体协调器',icon=':material/account_tree:'),st.Page('app_pages/conversations.py',title='历史对话',icon=':material/history:'),st.Page('app_pages/knowledge.py',title='医疗知识库',icon=':material/menu_book:')],
     'Agent 中心': [st.Page('app_pages/'+meta['page']+'.py',title=meta['name'],icon=':material/'+meta['icon']+':') for key,meta in AGENTS.items() if key not in ('vision','family','schedule','care')],
     '家庭组': [st.Page('app_pages/family_home.py',title='我的家庭',icon=':material/family_restroom:'),st.Page('app_pages/agent_family.py',title='家庭成员与留言',icon=':material/groups:'),st.Page('app_pages/agent_care.py',title='家属照护',icon=':material/diversity_1:'),st.Page('app_pages/agent_schedule.py',title='关怀提醒',icon=':material/alarm:')],
     '项目管理': [st.Page('app_pages/monitor.py',title='运行监控',icon=':material/monitoring:'),st.Page('app_pages/evaluation.py',title='评估与设置',icon=':material/tune:')]

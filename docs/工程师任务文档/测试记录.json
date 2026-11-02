@@ -1,0 +1,13 @@
+{
+  "date": "2026-11-02 Asia/Shanghai",
+  "command": ".venv/Scripts/python.exe -m unittest test_consultation_card test_conversations test_llm_engineering test_project_completion test_risk_results test_vision_monitor test_medication_knowledge",
+  "result": "OK",
+  "tests": 73,
+  "card_tests": 9,
+  "seconds": 16.748,
+  "additional_checks": [
+    "test_history_message_pages.py passed",
+    "test_navigation_performance.py passed"
+  ],
+  "real_model_api_called": false
+}

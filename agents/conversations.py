@@ -13,9 +13,15 @@ def _initialize(db):
     CREATE TABLE IF NOT EXISTS turns(conversation TEXT,request TEXT,payload TEXT,position INTEGER,PRIMARY KEY(conversation,request));
     CREATE INDEX IF NOT EXISTS conversations_owner_updated ON conversations(owner,updated DESC);
     CREATE INDEX IF NOT EXISTS turns_position ON turns(conversation,position);
+    CREATE TABLE IF NOT EXISTS consultation_card_versions(
+        conversation TEXT, version INTEGER, created TEXT, reason TEXT, payload TEXT,
+        PRIMARY KEY(conversation,version));
+    CREATE TABLE IF NOT EXISTS consultation_card_inputs(
+        conversation TEXT, request TEXT, original TEXT,
+        PRIMARY KEY(conversation,request));
     ''')
 
-def _connect(): return database(DB,_initialize,'conversations-1')
+def _connect(): return database(DB,_initialize,'conversations-2')
 def _owner(token):
     profile=identity_profile(token)
     if not profile.get('username'): raise PermissionError('请先登录账号')
@@ -86,7 +92,74 @@ def delete(token,key):
     with _connect() as db:
         db.execute('BEGIN IMMEDIATE'); _owned(db,owner,key)
         db.execute('DELETE FROM turns WHERE conversation=?',(key,))
+        db.execute('DELETE FROM consultation_card_versions WHERE conversation=?',(key,))
+        db.execute('DELETE FROM consultation_card_inputs WHERE conversation=?',(key,))
         db.execute('DELETE FROM conversations WHERE id=?',(key,))
+
+
+class CardConflict(ValueError):
+    """The displayed version was changed by another page/session."""
+
+
+def _card(db, key):
+    from .consultation_card import empty_card
+    row = db.execute('SELECT * FROM consultation_card_versions WHERE conversation=? ORDER BY version DESC LIMIT 1', (key,)).fetchone()
+    return dict(version=row['version'], created=row['created'], fields=json.loads(row['payload'])) if row else dict(version=0, created='', fields=empty_card())
+
+
+def _write_card(db, key, previous, fields, reason):
+    if fields == previous['fields']: return previous
+    version = previous['version'] + 1
+    stamp = _now()
+    db.execute('INSERT INTO consultation_card_versions VALUES(?,?,?,?,?)',
+               (key, version, stamp, reason, json.dumps(fields, ensure_ascii=False, sort_keys=True)))
+    return dict(version=version, created=stamp, fields=fields)
+
+
+def load_card(token, key):
+    owner = _owner(token)
+    with _connect() as db:
+        _owned(db, owner, key)
+        return _card(db, key)
+
+
+def ingest_card(token, key, request, original):
+    """Atomic extraction/receipt; retries never replay an older input over a newer edit."""
+    from .consultation_card import extract, merge
+    owner = _owner(token)
+    with _connect() as db:
+        db.execute('BEGIN IMMEDIATE')
+        _owned(db, owner, key)
+        previous = _card(db, key)
+        receipt = db.execute('SELECT original FROM consultation_card_inputs WHERE conversation=? AND request=?', (key, request)).fetchone()
+        if receipt:
+            if receipt['original'] != original: raise ValueError('来源请求编号已对应其他原话')
+            return previous
+        fields = merge(previous['fields'], extract(original, request))
+        db.execute('INSERT INTO consultation_card_inputs VALUES(?,?,?)', (key, request, original))
+        return _write_card(db, key, previous, fields, '用户输入提取')
+
+
+def save_card(token, key, edits, expected_version):
+    from .consultation_card import confirm, same_decisions
+    owner = _owner(token)
+    with _connect() as db:
+        db.execute('BEGIN IMMEDIATE')
+        _owned(db, owner, key)
+        previous = _card(db, key)
+        if same_decisions(previous['fields'], edits): return previous
+        if previous['version'] != expected_version:
+            raise CardConflict('核对卡已在其他页面更新，请重新载入后核对。')
+        fields = confirm(previous['fields'], edits, 'card-edit-' + uuid.uuid4().hex[:12])
+        return _write_card(db, key, previous, fields, '用户确认保存')
+
+
+def card_versions(token, key):
+    owner = _owner(token)
+    with _connect() as db:
+        _owned(db, owner, key)
+        return [dict(version=row['version'], created=row['created'], reason=row['reason'], fields=json.loads(row['payload']))
+                for row in db.execute('SELECT * FROM consultation_card_versions WHERE conversation=? ORDER BY version DESC', (key,))]
 
 def markdown(record):
     lines=['# '+record['title'],'']

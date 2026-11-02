@@ -24,7 +24,7 @@ app=AppTest.from_file('app.py',default_timeout=40).run()
 app.session_state.personal_token=account
 app.session_state.family_token=member['token']
 app.run()
-pages=['agent_consultation','agent_medication','agent_risk','agent_education',
+pages=['coordinator','agent_consultation','agent_medication','agent_risk','agent_education',
        'agent_family','agent_care','agent_schedule','family_home','knowledge','monitor']
 result={}
 f._last_poll.clear()

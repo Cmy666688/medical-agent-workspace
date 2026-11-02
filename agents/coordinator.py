@@ -75,25 +75,26 @@ class Coordinator:
         if service is None: raise RuntimeError('retrieval_unavailable')
         return service.search(query)
 
-    async def run(self, question, context, history: InMemoryChatMessageHistory, session, config=None,on_event=None):
+    async def run(self, question, context, history: InMemoryChatMessageHistory, session, config=None,on_event=None,request_id=None):
         def notify(agent,status,**details):
             if on_event:
                 try: on_event(copy.deepcopy(dict(agent=agent,status=status,**details)))
                 except Exception: pass
-        request = uuid.uuid4().hex[:12]; started = time.perf_counter(); trace=[]; conflicts=[]
+        request = request_id or uuid.uuid4().hex[:12]; started = time.perf_counter(); trace=[]; conflicts=[]
         notify('问诊 Agent','执行中')
         consultation = await ConsultationAgent().run(question, context, history); trace.append(consultation)
-        notify('问诊 Agent',consultation.status)
+        notify('问诊 Agent',consultation.status,duration_ms=consultation.duration_ms,error=consultation.error)
         if consultation.status == '失败': raise RuntimeError('问诊信息处理失败')
         notify('风险评估 Agent','执行中')
         risk = await RiskAgent().run(consultation.output); trace.append(risk)
-        notify('风险评估 Agent',risk.status,output=risk.output)
+        notify('风险评估 Agent',risk.status,output=risk.output,duration_ms=risk.duration_ms,error=risk.error)
         if risk.status == '失败': raise RuntimeError('风险检查不可用，请稍后重试或线下咨询')
         urgent=bool(risk.output['red_flags'])
         consultation.output['risk_alert']=dict(red_flags=risk.output['red_flags'],recommendation=risk.output['recommendation'])
         llm = LLMClient(config) if config and config.api_key else None
         if llm and not risk.output['red_flags']:
             llm_start=time.perf_counter()
+            notify('问诊 LLM','执行中')
             try:
                 enriched=await llm.structured('你是问诊信息整理助手。只提取用户明确描述的症状，提出缺失信息的追问；不能诊断、给概率或处方。',dict(question=question,context=context,history=[dict(role=m.type,content=m.content) for m in history.messages[-6:]]),ConsultationSummary,session,request,'问诊 Agent')
                 consultation.output.update(enriched.model_dump(),mode='在线 LLM 结构化信息整理')
@@ -101,6 +102,7 @@ class Coordinator:
             except LLMError as exc:
                 record(session,request,'failure',agent='问诊 LLM',error=str(exc))
                 trace.append(AgentResult('问诊 LLM','失败',(time.perf_counter()-llm_start)*1000,error=str(exc)))
+            notify('问诊 LLM',trace[-1].status,duration_ms=trace[-1].duration_ms,error=trace[-1].error)
         evidence = []
         if urgent:
             conflicts.append('风险提醒已优先展示；继续提供相关资料与用药信息核对，不能据此延迟就医或自行用药。')
@@ -109,17 +111,17 @@ class Coordinator:
         retrieval, medication = await asyncio.gather(asyncio.to_thread(self.search, consultation.output['query']), MedicationAgent().run(consultation.output),return_exceptions=True)
         if isinstance(medication,Exception):
             medication=AgentResult('用药 Agent','失败',(time.perf_counter()-start)*1000,error=type(medication).__name__)
-        trace.append(medication); notify('用药 Agent',medication.status)
+        trace.append(medication); notify('用药 Agent',medication.status,duration_ms=medication.duration_ms,error=medication.error)
         if medication.status=='完成': risk.output['medication_check']=medication.output
         if isinstance(retrieval,Exception):
             risk.output.update(retrieval_status='failed',retrieval_error=type(retrieval).__name__)
             trace.append(AgentResult('检索 Agent','失败',(time.perf_counter()-start)*1000,error=type(retrieval).__name__))
-            notify('检索 Agent','失败')
+            notify('检索 Agent','失败',duration_ms=trace[-1].duration_ms,error=trace[-1].error)
         else:
             start = time.perf_counter()
             try:
                 evidence = retrieval['evidences']
-                notify('检索 Agent','完成')
+                notify('检索 Agent','完成',duration_ms=retrieval['latency_ms'])
                 trace.append(AgentResult('检索 Agent','完成',retrieval['latency_ms'],retrieval))
                 record(session,request,'retrieval', latency_ms=retrieval['latency_ms'],no_hit=not evidence,cache_hit=retrieval['cache_hit'])
                 risk.output['retrieval_status']='completed' if evidence else 'no_hit'
@@ -131,7 +133,7 @@ class Coordinator:
                         trace.append(AgentResult('检索重排 Agent','完成',(time.perf_counter()-tick)*1000,dict(evidences=evidence)))
                     except LLMError as exc:
                         trace.append(AgentResult('检索重排 Agent','失败',(time.perf_counter()-tick)*1000,error=str(exc)))
-                    notify('检索重排 Agent',trace[-1].status)
+                    notify('检索重排 Agent',trace[-1].status,duration_ms=trace[-1].duration_ms,error=trace[-1].error)
                 if llm and config.enable_specialist_review:
                     from .specialists import review
                     for role in ('风险复核 Agent','用药复核 Agent'):
@@ -147,10 +149,10 @@ class Coordinator:
                         except LLMError as exc:
                             trace.append(AgentResult(role,'失败',(time.perf_counter()-tick)*1000,error=str(exc)))
                             if role=='风险复核 Agent': risk.output.update(online_status='failed',review_error=str(exc))
-                        notify(role,trace[-1].status)
+                        notify(role,trace[-1].status,duration_ms=trace[-1].duration_ms,error=trace[-1].error)
                 notify('资料解读 Agent','执行中')
                 trace.append(await EducationAgent().run(evidence))
-                notify('资料解读 Agent',trace[-1].status)
+                notify('资料解读 Agent',trace[-1].status,duration_ms=trace[-1].duration_ms,error=trace[-1].error)
             except Exception as exc:
                 trace.append(AgentResult('检索 Agent','失败',(time.perf_counter()-start)*1000,error=type(exc).__name__))
                 risk.output.update(retrieval_status='failed',retrieval_error=type(exc).__name__)
@@ -169,6 +171,7 @@ class Coordinator:
         if medication.output.get('duplicates'): answer+='\n- 检测到输入药名涉及重复成分，请核对是否为同一用药或复方重复。'
         if llm and evidence:
             llm_start=time.perf_counter()
+            notify('资料解读 LLM','执行中')
             try:
                 summary=await llm.structured('你是医疗资料解读助手。仅整理给定证据，source_ids 只能选输入中的 doc_id。不能诊断或给处方剂量；说明证据局限。若存在 risk_alert 危险信号，不得降低其优先级、建议等待或以居家处理替代就医。',dict(question=question,risk_alert=consultation.output['risk_alert'],evidence=[dict(doc_id=r['doc_id'],name=r['name'],content=r['content'][:600]) for r in evidence]),EvidenceSummary,session,request,'资料解读 Agent',stream=True)
                 if not set(summary.source_ids).issubset({r['doc_id'] for r in evidence}):
@@ -180,10 +183,12 @@ class Coordinator:
                 record(session,request,'failure',agent='资料解读 LLM',error=str(exc))
                 trace.append(AgentResult('资料解读 LLM','失败',(time.perf_counter()-llm_start)*1000,error=str(exc)))
                 answer += '\n\n在线资料解读未完成，已保留本地检索结果。'
+            notify('资料解读 LLM',trace[-1].status,duration_ms=trace[-1].duration_ms,error=trace[-1].error)
         for item in trace:
-            notify(item.agent,item.status)
+            notify(item.agent,item.status,duration_ms=item.duration_ms,error=item.error)
             record(session,request,'agent',agent=item.agent,status=item.status,latency_ms=item.duration_ms,error=item.error)
-        record(session,request,'request',latency_ms=(time.perf_counter()-started)*1000,mode='llm' if config and config.api_key else 'local')
+        duration_ms=(time.perf_counter()-started)*1000
+        record(session,request,'request',latency_ms=duration_ms,mode='llm' if config and config.api_key else 'local')
         history.add_user_message(question); history.add_ai_message(answer)
         history.messages = history.messages[-12:]
-        return dict(request=request,answer=answer,evidences=evidence,trace=[vars(x) for x in trace],conflicts=conflicts)
+        return dict(request=request,answer=answer,evidences=evidence,trace=[vars(x) for x in trace],conflicts=conflicts,duration_ms=duration_ms)

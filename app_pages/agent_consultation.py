@@ -1,9 +1,9 @@
-import asyncio
 import json
 import streamlit as st
-from agents.coordinator import Coordinator
 from agents.telemetry import record
-from ui import retrieval, llm_config, evidence_cards
+from execution_timeline import render_timeline
+from ui import llm_config, evidence_cards
+from consultation_run_ui import submit_consultation
 
 st.caption('健康助手 / 问诊')
 heading, mode=st.columns([3,1])
@@ -25,11 +25,24 @@ with st.expander('个人情况 · 补充后可减少重复追问',icon=':materia
 from agents import conversations as conversation_store
 conversation_context=dict(age=age,allergies=allergies,medications=medications)
 conversation_store.context(st.session_state.personal_token,st.session_state.conversation_id,conversation_context)
+from consultation_card_ui import card_panel
+from agents.consultation_card import context_from_card
+checked_card=card_panel()
+conversation_context=context_from_card(checked_card['fields'],conversation_context)
+failure_notice=st.session_state.pop('consultation_failure_notice',None)
+if failure_notice: st.error(failure_notice)
+if st.session_state.get('consultation_failed_timeline'):
+    render_timeline(st.session_state.consultation_failed_timeline)
 for turn in st.session_state.turns:
     with st.chat_message('user'): st.write(turn['question'])
     with st.chat_message('assistant'):
         st.markdown(turn['answer'])
         if turn['conflicts']: st.warning('；'.join(turn['conflicts']))
+        if turn.get('trace'):
+            if turn is st.session_state.turns[-1]: render_timeline(turn['trace'])
+            else:
+                with st.expander('查看本轮执行时间轴',icon=':material/timeline:'):
+                    render_timeline(turn['trace'])
         with st.expander(f"协作记录 · {len(turn['trace'])} 个步骤 · {len(turn['evidences'])} 条证据",icon=':material/account_tree:'):
             for x in turn['trace']:
                 st.markdown(f"**{x['agent']}**　{x['status']}　·　{x['duration_ms']:.0f} ms")
@@ -57,30 +70,4 @@ handoff=st.session_state.get('vision_handoff')
 if handoff: st.info('已接收图片观察摘要；下一条问诊将附带这份未经核实的观察信息。')
 question=st.chat_input('描述症状、持续时间或想查阅的疾病资料',max_chars=1000)
 if question:
-    active_conversation=st.session_state.conversation_id
-    active_token=st.session_state.personal_token
-    active_session=st.session_state.session_id
-    if handoff:
-        question=question+'\n'+st.session_state.pop('vision_handoff')
-    with st.chat_message('user'): st.write(question)
-    try:
-        risk_notice=st.empty()
-        with st.status('正在整理问诊信息、检查危险信号并检索资料…',expanded=True) as status:
-            progress=st.empty(); states={}
-            def show_progress(event):
-                if event.get('output',{}).get('red_flags'):
-                    risk_notice.warning(event['output']['recommendation']+' 相关资料将继续加载，请勿等待结果再就医。')
-                states[event['agent']]=event['status']
-                with progress.container():
-                    for name,state in states.items(): st.write(name+' · '+state)
-            result=asyncio.run(Coordinator(retrieval).run(question,conversation_context,st.session_state.history,active_session,llm_config(),on_event=show_progress))
-            for x in result['trace']: st.write(f"{x['agent']} · {x['status']} · {x['duration_ms']:.0f} ms")
-            status.update(label='协作完成',state='complete')
-        turn=dict(question=question,**result)
-        conversation_store.append(active_token,active_conversation,turn,conversation_context)
-        if st.session_state.conversation_id==active_conversation:
-            st.session_state.turns.append(turn)
-            st.session_state.persisted_requests.add(turn['request'])
-        st.rerun()
-    except Exception as exc:
-        st.error('本次协作未完成：'+str(exc))
+    submit_consultation(question, conversation_context)

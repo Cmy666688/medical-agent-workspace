@@ -24,3 +24,9 @@ jobs:
         run: python test_public_deployment.py
       - name: Test medication source matching and UI
         run: python -m unittest test_medication_knowledge
+      - name: Test consultation card ownership, versions and UI
+        run: python -m unittest test_consultation_card
+      - name: Test execution timeline and real progress events
+        run: python -m unittest test_execution_timeline
+      - name: Test coordinator page and shared conversation persistence
+        run: python -m unittest test_coordinator_page
