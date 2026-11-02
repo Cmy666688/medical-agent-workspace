@@ -1,0 +1,5 @@
+# Activate only after merging/backing up existing local and public user stores.
+# Both web services then use these account/family/conversation/quota databases.
+# Per-service model indexes, logs and cookie settings remain in their runtime directories.
+[storage]
+user_data_dir = "runtime/shared"

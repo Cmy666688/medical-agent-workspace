@@ -1,5 +1,6 @@
 import streamlit as st
 from agents.household_agents import tools as store
+from family_invite_ui import invitation_panel
 
 st.caption('医知协作 / 家庭组')
 st.title('家庭成员与留言',icon=':material/family_restroom:')
@@ -13,16 +14,8 @@ if not person:
 
 else:
     st.success(person['family']+' · '+person['name'])
-    creds=st.session_state.get('new_family_credentials',{})
-    if creds:
-        with st.expander('家庭邀请信息',expanded=True):
-            st.caption('家庭邀请码有效 7 天，创建者可随时刷新。家人使用各自账号和此邀请码加入。')
-            if creds.get('token'): st.code(creds['token'])
-            if creds.get('invite'): st.write('家庭邀请码'); st.code(creds['invite'])
-            if st.button('我已保存，隐藏凭据'): st.session_state.new_family_credentials={}; st.rerun()
+    invitation_panel(token)
     with st.container(horizontal=True):
-        if person['role']=='owner' and st.button('刷新家庭邀请码'):
-            st.session_state.new_family_credentials=dict(invite=store.rotate_invite(token)); st.rerun()
         st.page_link('app_pages/family_home.py',label='查看或切换其他家庭',icon=':material/family_restroom:')
     roster=store.members(token)
     st.subheader('家庭成员')

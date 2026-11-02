@@ -113,7 +113,10 @@ class Tests(unittest.TestCase):
 
     def test_account_switch_discards_stale_history_card_and_vision(self):
         key=store.create(self.token);store.append(self.token,key,sample('甲用户的合成隐私'))
+        group=family.create_family('甲用户的家庭','本人',self.token)
         app=self.page(self.token)
+        app.session_state.new_family_credentials={'invite':group['invite']}
+        app.session_state.family_invites={'test':{'invite':group['invite']}}
         app.session_state.vision_handoff='甲用户的图片观察'
         app.session_state.agent_tests={'risk':{'output':'甲用户结果'}}
         app.session_state.personal_token=self.admin  # stale browser state must not migrate
@@ -122,6 +125,9 @@ class Tests(unittest.TestCase):
         self.assertEqual(app.session_state.turns,[])
         self.assertNotIn('vision_handoff',app.session_state)
         self.assertEqual(app.session_state.agent_tests,{})
+        self.assertEqual(app.session_state.family_token,'')
+        self.assertNotIn('new_family_credentials',app.session_state)
+        self.assertNotIn('family_invites',app.session_state)
         self.assertEqual(store.load(self.token,key)['turns'][0]['question'],'甲用户的合成隐私')
         self.assertNotIn('甲用户',str(store.listing(self.admin)))
 

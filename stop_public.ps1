@@ -18,6 +18,20 @@ foreach ($kind in @('supervisor','web','worker','tunnel')) {
     if (-not $matches) { throw "Process $serviceId does not match this public deployment. Nothing stopped." }
     $targets+=$serviceId
 }
+$snapshot=@(Get-CimInstance Win32_Process)
+$pending=@($targets)
+while ($pending.Count -gt 0) {
+    $parentId=$pending[0]
+    $pending=@($pending | Select-Object -Skip 1)
+    foreach ($child in $snapshot | Where-Object { $_.ParentProcessId -eq $parentId -and $_.ProcessId -notin $targets }) {
+        $valid=$child.Name -eq 'python.exe' -and (
+            ($child.CommandLine -like ('*'+(Join-Path $PSScriptRoot 'app.py')+'*') -and $child.CommandLine -like '*8503*') -or
+            ($child.CommandLine -like ('*'+(Join-Path $PSScriptRoot 'reminder_worker.py')+'*') -and $child.CommandLine -like '*--runtime-profile public*'))
+        if (-not $valid) { throw 'Unexpected public service child; nothing stopped.' }
+        $targets+=$child.ProcessId
+        $pending+=$child.ProcessId
+    }
+}
 foreach ($serviceId in $targets) { Stop-Process -Id $serviceId -ErrorAction SilentlyContinue }
 $state.phase='stopped'
 $state | ConvertTo-Json | Set-Content -LiteralPath $statePath -Encoding UTF8

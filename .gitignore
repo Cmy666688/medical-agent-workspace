@@ -6,6 +6,7 @@ __pycache__/
 .streamlit/secrets.toml
 *.zip
 config/api.local.toml
+config/storage.local.toml
 # Private runtime, credentials, datasets and local course materials
 .env
 .env.*

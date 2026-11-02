@@ -1,5 +1,6 @@
 """家庭成员、共享授权和站内协作。访问密钥只保存摘要。"""
 import hashlib
+import hmac
 import json
 import os
 import secrets
@@ -11,9 +12,10 @@ import uuid
 import threading
 import time
 from .sqlite_store import database
+from .storage_paths import user_data_root
 
 ROOT=Path(__file__).resolve().parents[1]
-DB=Path(os.getenv('MEDICAL_RUNTIME_DIR',str(ROOT/'runtime')))/'family.sqlite'
+DB=user_data_root()/'family.sqlite'
 TZ=timezone(timedelta(hours=8))
 def now(): return datetime.now(TZ)
 def digest(value): return hashlib.sha256(value.encode()).hexdigest()
@@ -99,12 +101,16 @@ def create_family(name,display,identity_token=None):
 def join_family(invitation,display,identity_token=None):
     if not display.strip(): raise ValueError('请填写成员称呼')
     token=secrets.token_urlsafe(32)
+    if not isinstance(invitation,str) or len(invitation)>512: raise ValueError('请复制完整的家庭邀请码')
+    invitation=invitation.strip().strip('\u200b\ufeff').strip()
     with connect() as db:
-        group=db.execute('SELECT * FROM households WHERE invite_hash=?',(digest(invitation.strip()),)).fetchone()
-        if not group or datetime.fromisoformat(group['expires'])<now(): raise PermissionError('邀请码无效或已过期')
+        db.execute('BEGIN IMMEDIATE')
+        identity=identity_actor(db,identity_token) if identity_token else None
+        group=db.execute('SELECT * FROM households WHERE invite_hash=?',(digest(invitation),)).fetchone()
+        if not group: raise PermissionError('邀请码无效或已过期。请复制创建者最新分享的完整邀请码；刷新后旧码会失效。')
+        if datetime.fromisoformat(group['expires'])<=now(): raise PermissionError('邀请码已过期，请让家庭创建者生成新的邀请码。')
         mid=uuid.uuid4().hex
         if identity_token:
-            identity=identity_actor(db,identity_token)
             existing=db.execute('SELECT m.id FROM members m JOIN identity_members l ON l.member=m.id WHERE l.identity=? AND m.group_id=?',(identity['id'],group['id'])).fetchone()
             if existing: return dict(token=identity_token+'.'+existing['id'])
         db.execute('INSERT INTO members VALUES (?,?,?,?,?,?)',(mid,group['id'],display.strip()[:40],digest(token),'member',now().isoformat()))
@@ -149,6 +155,15 @@ def rotate_invite(token):
         db.execute('UPDATE households SET invite_hash=?,expires=? WHERE id=?',(digest(invitation),(now()+timedelta(days=7)).isoformat(),person['group_id']))
         audit(db,person,person['group_id'],'rotate_invite')
     return invitation
+
+
+def invitation_info(token,candidate=None):
+    with connect() as db:
+        person=actor(db,token)
+        if person['role']!='owner': raise PermissionError('仅家庭创建者可查看邀请信息')
+        row=db.execute('SELECT expires,invite_hash FROM households WHERE id=?',(person['group_id'],)).fetchone()
+        return dict(group_id=person['group_id'],expires=row['expires'],expired=datetime.fromisoformat(row['expires'])<=now(),
+                    matches=isinstance(candidate,str) and hmac.compare_digest(row['invite_hash'],digest(candidate)))
 
 def add_measurement(token,kind,content):
     if kind=='血压':

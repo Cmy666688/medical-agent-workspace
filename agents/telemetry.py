@@ -5,9 +5,10 @@ from pathlib import Path
 from datetime import datetime, timezone
 from contextlib import contextmanager
 from .sqlite_store import database
+from .storage_paths import user_data_root
 
 ROOT = Path(__file__).resolve().parents[1]
-DB = Path(os.getenv('MEDICAL_RUNTIME_DIR',str(ROOT / 'runtime'))) / 'monitor.sqlite'
+DB = user_data_root() / 'monitor.sqlite'
 
 def _initialize(db):
     db.execute('CREATE TABLE IF NOT EXISTS events (time TEXT, session TEXT, request TEXT, kind TEXT, data TEXT)')

@@ -8,11 +8,17 @@ if __name__=='__main__':
     lock=(DB.parent/'reminder_worker.lock').open('a+b')
     if lock.tell()==0: lock.write(b'0'); lock.flush()
     lock.seek(0)
-    try:
-        import msvcrt
-        msvcrt.locking(lock.fileno(),msvcrt.LK_NBLCK,1)
-    except OSError:
-        logging.info('已有提醒进程运行'); raise SystemExit(0)
+    import msvcrt
+    waiting=False
+    while True:
+        try:
+            lock.seek(0)
+            msvcrt.locking(lock.fileno(),msvcrt.LK_NBLCK,1)
+            break
+        except OSError:
+            if not waiting: logging.info('共享提醒已有工作进程，本进程待命。')
+            waiting=True
+            time.sleep(5)
     while True:
         try: tick(); worker_heartbeat()
         except Exception: logging.exception('提醒调度失败')

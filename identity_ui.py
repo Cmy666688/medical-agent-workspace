@@ -83,3 +83,5 @@ def family_switcher():
         if preferred in ids: st.session_state['family_selection_'+profile['id']]=preferred
         selected=st.selectbox('当前家庭',ids,index=ids.index(current) if current in ids else 0,format_func=lambda mid:names[mid],key='family_selection_'+profile['id'])
         st.session_state.family_token=token+'.'+selected
+    else:
+        st.session_state.family_token=''

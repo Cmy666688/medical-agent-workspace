@@ -2,6 +2,7 @@ import streamlit as st
 from agents import family as store
 from agents.household_agents import tools as household
 from auth_ui import auth_panel,recovery_card
+from family_invite_ui import remember_invite,invitation_panel
 
 personal=st.session_state.get('personal_token')
 if not personal:
@@ -47,12 +48,13 @@ else:
                 st.caption('健康记录由本人决定共享，加入家庭不会自动开放私人数据。')
             with picture: st.image('assets/wellness-orbit.svg',width='stretch',alt='连接家庭、健康资料与日常关怀的绿色轨道')
     st.space('small')
+    invitation_panel(st.session_state.get('family_token',''))
     operation,tips=st.columns([1.5,1],gap='large')
     with operation:
         with st.container(border=True):
             st.subheader('拓展你的家庭空间',icon=':material/group_add:')
             action=st.segmented_control('家庭操作',['创建家庭','加入家庭','找回旧家庭'],default='创建家庭',width='stretch')
-            with st.form('family_membership',clear_on_submit=True):
+            with st.form('family_membership',clear_on_submit=action!='加入家庭'):
                 if action=='创建家庭':
                     name=st.text_input('家庭名称',placeholder='例如：我们温暖的小家',max_chars=80)
                     display=st.text_input('在家庭中的称呼',value=profile['display'],max_chars=40)
@@ -69,7 +71,7 @@ else:
                     else:
                         result=household.create_family(name,display,identity_token=personal) if action=='创建家庭' else household.join_family(invite,display,identity_token=personal)
                         member_token=result['token']
-                        st.session_state.new_family_credentials=dict(invite=result.get('invite')) if result.get('invite') else {}
+                        remember_invite(member_token,result.get('invite'))
                     st.session_state.family_token=member_token
                     st.session_state.preferred_family=member_token.split('.')[-1]
                     st.rerun()

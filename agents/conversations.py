@@ -4,8 +4,9 @@ from pathlib import Path
 from datetime import datetime,timezone
 from .family import identity_profile
 from .sqlite_store import database
+from .storage_paths import user_data_root
 
-DB=Path(os.getenv('MEDICAL_RUNTIME_DIR',str(Path(__file__).resolve().parents[1]/'runtime')))/'conversations.sqlite'
+DB=user_data_root()/'conversations.sqlite'
 
 def _initialize(db):
     db.executescript('''

@@ -26,7 +26,7 @@ try {
         $server = Start-Process -FilePath $python -ArgumentList $arguments -WorkingDirectory $PSScriptRoot -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $runtime 'server.log') -RedirectStandardError (Join-Path $runtime 'server-error.log')
     }
     $workerPath = Join-Path $PSScriptRoot 'reminder_worker.py'
-    $workers = Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" | Where-Object { $_.CommandLine -like "*$workerPath*" }
+    $workers = Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" | Where-Object { $_.CommandLine -like "*$workerPath*" -and $_.CommandLine -notlike '*--runtime-profile public*' }
     if (-not $workers) {
         Start-Process -FilePath $python -ArgumentList ('"' + $workerPath + '"') -WorkingDirectory $PSScriptRoot -WindowStyle Hidden -RedirectStandardOutput (Join-Path $runtime 'reminder.log') -RedirectStandardError (Join-Path $runtime 'reminder-error.log')
     }

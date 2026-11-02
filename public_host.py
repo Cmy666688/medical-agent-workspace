@@ -1,4 +1,4 @@
-"""Own a separate public web/worker/tunnel process group. No local user DB is copied."""
+"""Own public web/worker/tunnel processes; user storage follows shared configuration."""
 import json,os,re,secrets,shutil,subprocess,sys,time
 from pathlib import Path
 from urllib.request import urlopen
@@ -70,7 +70,7 @@ def run():
     try:
         if previous:
             if not re.fullmatch(r'https://[a-z0-9-]+\.trycloudflare\.com',previous['url']): raise ValueError('Invalid recorded tunnel URL')
-            for kind in ('tunnel','worker'):
+            for kind in ('tunnel',):
                 process=ExistingProcess(previous[kind+'_pid'],kind);children.append(process);state[kind+'_pid']=process.pid
             state['url']=previous['url']
         else:
@@ -88,7 +88,7 @@ def run():
         env['STREAMLIT_BROWSER_SERVER_ADDRESS']=host
         env['STREAMLIT_BROWSER_SERVER_PORT']='443'
         web=launch('web',[sys.executable,'-m','streamlit','run',str(ROOT/'app.py'),'--server.address','127.0.0.1','--server.port',str(PORT)])
-        if not previous: worker=launch('worker',[sys.executable,str(ROOT/'reminder_worker.py'),'--runtime-profile','public'])
+        worker=launch('worker',[sys.executable,str(ROOT/'reminder_worker.py'),'--runtime-profile','public'])
         deadline=time.monotonic()+45
         while time.monotonic()<deadline:
             if web.poll() is not None: raise RuntimeError('Public web service exited; see web.log')
@@ -108,7 +108,10 @@ def run():
         raise
     finally:
         for process in children:
-            if process.poll() is None: process.terminate()
+            if process.poll() is None:
+                if isinstance(process,ExistingProcess): process.terminate()
+                else:
+                    subprocess.run(['taskkill','/PID',str(process.pid),'/T','/F'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,creationflags=subprocess.CREATE_NO_WINDOW)
             if isinstance(process,ExistingProcess): process.close()
         for log in logs: log.close()
 

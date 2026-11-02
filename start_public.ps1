@@ -35,7 +35,7 @@ try {
     if ($state.phase -ne 'ready') { throw 'Public startup timed out. See runtime\public logs.' }
     Write-Host ('Public URL: '+$state.url+'/account')
     Write-Host 'This URL stays available while this computer and its public services are running.'
-    Write-Host 'Public accounts and family records are separate from the local workspace.'
+    Write-Host 'Account and family storage follows config/storage.local.toml when configured.'
     if (-not $NoBrowser) { Start-Process ($state.url+'/account') }
 } finally {
     if ($locked) { $mutex.ReleaseMutex() }
