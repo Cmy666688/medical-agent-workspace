@@ -19,6 +19,9 @@ while ($pending.Count -gt 0) {
     $parentId=$pending[0]
     $pending=@($pending | Select-Object -Skip 1)
     foreach ($child in $snapshot | Where-Object { $_.ParentProcessId -eq $parentId -and $_.ProcessId -notin $targets -and $_.ProcessId -ne $state.tunnel_pid }) {
+        # Windows may attach its own console host to a hidden Python process.
+        # It exits with the console; never treat it as an application to kill.
+        if ($child.Name -eq 'conhost.exe' -and $child.ExecutablePath -eq (Join-Path $env:WINDIR 'System32\conhost.exe')) { continue }
         $valid=$child.Name -eq 'python.exe' -and (
             ($child.CommandLine -like ('*'+(Join-Path $PSScriptRoot 'app.py')+'*') -and $child.CommandLine -like '*8503*') -or
             ($child.CommandLine -like ('*'+(Join-Path $PSScriptRoot 'reminder_worker.py')+'*') -and $child.CommandLine -like '*--runtime-profile public*'))

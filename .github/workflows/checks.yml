@@ -34,3 +34,5 @@ jobs:
         run: python -m unittest test_user_management
       - name: Test shared user migration and household invitations
         run: python -m unittest test_shared_user_store
+      - name: Test family membership feedback and navigation
+        run: python -m unittest test_family_membership_feedback

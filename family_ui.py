@@ -1,6 +1,42 @@
 import streamlit as st
 from agents.household_agents import tools as store
 
+
+def open_membership(token,action,already_member=False):
+    """Select the verified membership, then show a durable result on its page."""
+    from agents import family
+    owner=family.identity_profile(st.session_state.personal_token)
+    person=family.profile(token)
+    mine=family.my_families(st.session_state.personal_token)
+    if person['id'] not in {item['member_id'] for item in mine}:
+        raise PermissionError('当前账号无权切换到该家庭')
+    st.session_state.family_token=token
+    st.session_state.preferred_family=person['id']
+    st.session_state.family_membership_notice=dict(owner=owner['id'],group_id=person['group_id'],
+                                                  action=action,already_member=bool(already_member))
+
+
+def membership_feedback(person):
+    from agents import family
+    notice=st.session_state.get('family_membership_notice')
+    if not notice:return
+    owner=family.identity_profile(st.session_state.personal_token)
+    if notice.get('owner')!=owner['id']:
+        st.session_state.pop('family_membership_notice',None)
+        return
+    if notice.get('group_id')!=person['group_id']:
+        st.session_state.pop('family_membership_notice',None)
+        return
+    if notice.get('already_member'):
+        st.info('你已是「'+person['family']+'」的成员，已为你打开该家庭。',icon=':material/info:')
+    else:
+        action={'创建家庭':'已创建','加入家庭':'已成功加入','找回旧家庭':'已找回'}.get(notice.get('action'),'已进入')
+        st.success(action+'「'+person['family']+'」。',icon=':material/check_circle:')
+    name='@'+owner['username'] if owner.get('username') else owner['display']
+    st.caption('当前登录账号：'+name+' · 家庭中共有 '+str(len(store.members(st.session_state.family_token)))+' 位成员')
+    if st.button('我知道了',key='membership_ack_'+person['group_id']):
+        st.session_state.pop('family_membership_notice',None);st.rerun()
+
 def require_member():
     token=st.session_state.get('family_token','')
     try: return store.profile(token)

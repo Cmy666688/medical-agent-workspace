@@ -46,7 +46,7 @@ def ensure_conversation():
     cached_owner=st.session_state.get('conversation_owner')
     if cached_owner is not None and cached_owner!=owner:
         _clear_context(); st.session_state.pop('conversation_id',None)
-        for key in ('family_token','preferred_family','family_invites','new_family_credentials','account_recovery'):
+        for key in ('family_token','preferred_family','family_invites','new_family_credentials','family_membership_notice','account_recovery'):
             st.session_state.pop(key,None)
     current=st.session_state.get('conversation_id')
     if current:

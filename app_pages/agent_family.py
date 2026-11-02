@@ -1,6 +1,7 @@
 import streamlit as st
 from agents.household_agents import tools as store
 from family_invite_ui import invitation_panel
+from family_ui import membership_feedback
 
 st.caption('医知协作 / 家庭组')
 st.title('家庭成员与留言',icon=':material/family_restroom:')
@@ -13,6 +14,7 @@ if not person:
     st.page_link('app_pages/family_home.py',label='进入我的家庭',icon=':material/family_restroom:')
 
 else:
+    membership_feedback(person)
     st.success(person['family']+' · '+person['name'])
     invitation_panel(token)
     with st.container(horizontal=True):

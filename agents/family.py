@@ -103,6 +103,7 @@ def join_family(invitation,display,identity_token=None):
     token=secrets.token_urlsafe(32)
     if not isinstance(invitation,str) or len(invitation)>512: raise ValueError('请复制完整的家庭邀请码')
     invitation=invitation.strip().strip('\u200b\ufeff').strip()
+    if not invitation: raise ValueError('请先填写家庭邀请码')
     with connect() as db:
         db.execute('BEGIN IMMEDIATE')
         identity=identity_actor(db,identity_token) if identity_token else None
@@ -112,12 +113,16 @@ def join_family(invitation,display,identity_token=None):
         mid=uuid.uuid4().hex
         if identity_token:
             existing=db.execute('SELECT m.id FROM members m JOIN identity_members l ON l.member=m.id WHERE l.identity=? AND m.group_id=?',(identity['id'],group['id'])).fetchone()
-            if existing: return dict(token=identity_token+'.'+existing['id'])
+            if existing:
+                count=db.execute('SELECT COUNT(*) FROM members WHERE group_id=?',(group['id'],)).fetchone()[0]
+                return dict(token=identity_token+'.'+existing['id'],already_member=True,family_name=group['name'],member_count=count)
         db.execute('INSERT INTO members VALUES (?,?,?,?,?,?)',(mid,group['id'],display.strip()[:40],digest(token),'member',now().isoformat()))
         if identity_token:
             db.execute('INSERT INTO identity_members VALUES (?,?)',(identity['id'],mid))
             token=identity_token+'.'+mid
-    return dict(token=token)
+        audit(db,dict(id=mid),group['id'],'join_family')
+        count=db.execute('SELECT COUNT(*) FROM members WHERE group_id=?',(group['id'],)).fetchone()[0]
+    return dict(token=token,already_member=False,family_name=group['name'],member_count=count)
 
 def profile(token):
     with connect() as db:

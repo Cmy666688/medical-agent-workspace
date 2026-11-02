@@ -1,8 +1,10 @@
 import streamlit as st
+import sqlite3
 from agents import family as store
 from agents.household_agents import tools as household
 from auth_ui import auth_panel,recovery_card
 from family_invite_ui import remember_invite,invitation_panel
+from family_ui import open_membership
 
 personal=st.session_state.get('personal_token')
 if not personal:
@@ -15,6 +17,7 @@ else:
     with heading:
         st.title('我的家庭',icon=':material/family_restroom:')
         st.write('你好，'+profile['display']+'。让家人的近况有处可看，让日常关怀准时到达。')
+        if profile.get('username'): st.caption('当前登录账号：@'+profile['username']+' · 家人请使用各自的账号加入家庭')
     with account:
         st.page_link('app_pages/account.py',label='我的账户' if profile.get('username') else '升级为登录账号',icon=':material/account_circle:')
     if not profile.get('username'):
@@ -59,7 +62,7 @@ else:
                     name=st.text_input('家庭名称',placeholder='例如：我们温暖的小家',max_chars=80)
                     display=st.text_input('在家庭中的称呼',value=profile['display'],max_chars=40)
                 elif action=='加入家庭':
-                    invite=st.text_input('家庭邀请码',type='password',placeholder='向家庭创建人获取')
+                    invite=st.text_input('家庭邀请码',type='password',placeholder='向家庭创建人获取',max_chars=128,help='复制完整邀请码，保留原有大小写。')
                     display=st.text_input('在家庭中的称呼',value=profile['display'],max_chars=40)
                 else:
                     legacy=st.text_input('原成员访问密钥',type='password')
@@ -67,15 +70,19 @@ else:
                 submit=st.form_submit_button(action,type='primary',width='stretch')
             if submit:
                 try:
-                    if action=='找回旧家庭': member_token=store.import_membership(personal,legacy)
-                    else:
-                        result=household.create_family(name,display,identity_token=personal) if action=='创建家庭' else household.join_family(invite,display,identity_token=personal)
-                        member_token=result['token']
-                        remember_invite(member_token,result.get('invite'))
-                    st.session_state.family_token=member_token
-                    st.session_state.preferred_family=member_token.split('.')[-1]
-                    st.rerun()
+                    already_member=False
+                    with st.spinner('正在验证邀请码并加入家庭…' if action=='加入家庭' else '正在处理家庭信息…'):
+                        if action=='找回旧家庭': member_token=store.import_membership(personal,legacy)
+                        else:
+                            result=household.create_family(name,display,identity_token=personal) if action=='创建家庭' else household.join_family(invite,display,identity_token=personal)
+                            member_token=result['token']
+                            already_member=result.get('already_member',False)
+                            remember_invite(member_token,result.get('invite'))
+                        open_membership(member_token,action,already_member)
+                    st.switch_page('app_pages/agent_family.py')
                 except (ValueError,PermissionError) as exc: st.error(str(exc))
+                except sqlite3.Error:
+                    st.error('家庭服务暂时繁忙，尚未确认加入结果，请稍后再试。重复提交不会重复创建成员。')
     with tips:
         st.subheader('每一步关怀，都很简单')
         for icon,title,text in [('person_add','邀请家人','创建后分享邀请码，家人用各自账号加入。'),('lock','按需共享','本人授权后，家人才能查看记录或管理提醒。'),('favorite','保持联系','留一句话、请求报平安，让关心有回应。')]:
