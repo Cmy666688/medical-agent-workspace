@@ -26,7 +26,7 @@ class HouseholdAgent:
 
 class FamilyAgent(HouseholdAgent):
     name='家庭协作 Agent'
-    actions=('create_family','join_family','set_grant','rotate_invite','send_message')
+    actions=('create_family','join_family','set_grant','rotate_invite','send_message','set_reminder_delegates','request_reminder_access','respond_reminder_access')
 
 class ScheduleAgent(HouseholdAgent):
     name='定时关怀 Agent'
@@ -40,7 +40,7 @@ class Tools:
     def __getattr__(self,action):
         for cls in (FamilyAgent,ScheduleAgent,CareAgent):
             if action in cls.actions: return lambda *a,**kw:cls().run(action,*a,**kw)
-        if action in ('profile','members','grants_given','messages','schedules','notices','audit_log','tick','now','worker_status','poll_reminders'):
+        if action in ('profile','members','grants_given','messages','schedules','notices','audit_log','tick','now','worker_status','poll_reminders','reminder_requests','reminder_request_status'):
             return getattr(family,action)
         raise AttributeError(action)
 

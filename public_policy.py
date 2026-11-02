@@ -4,6 +4,21 @@ import os
 def public_mode():
     return os.getenv('MEDICAL_PUBLIC_MODE')=='1'
 
+
+def is_project_admin():
+    import streamlit as st
+    from agents.family import identity_profile
+    token=st.session_state.get('personal_token')
+    try:return bool(token) and identity_profile(token).get('role')=='admin'
+    except PermissionError:return False
+
+
+def require_project_admin():
+    import streamlit as st
+    if not is_project_admin():
+        st.error('仅管理员可访问项目管理，请使用管理员账号登录。')
+        st.stop()
+
 def management_notice():
     import streamlit as st
     st.title('此功能由服务管理者维护')

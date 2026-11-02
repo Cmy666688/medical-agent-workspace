@@ -4,6 +4,7 @@ import streamlit as st
 from agents.household_agents import tools as store
 from agents.family import REMINDER_TYPES
 from family_ui import require_member,target_picker,inbox
+from reminder_permissions_ui import permissions_panel,request_access
 
 st.caption('医知协作 / 家庭组')
 st.title('关怀提醒',icon=':material/alarm:')
@@ -16,7 +17,15 @@ if heartbeat:
 else: st.warning('后台调度尚无心跳，请通过启动项目.ps1 启动完整服务。')
 st.caption('北京时间；事项与频次由成员填写，不自动决定药物或剂量。提醒为站内待办，依赖电脑和后台运行。')
 inbox()
-target=target_picker('can_manage')
+permissions_panel(person)
+st.subheader('为谁设置提醒',icon=':material/person:')
+st.caption('当前家庭：'+person['family']+' · 选择其他成员可查看代设权限或发起授权申请。')
+target=target_picker('can_manage',include_ungranted=True)
+if not target['can_manage']:
+    request_access(target)
+    st.stop()
+target_label=target['name']+(' · @'+target['username'] if target.get('username') else '')
+st.caption('正在为 '+target_label+' 设置提醒。到期事项会进入该成员自己的待办。')
 patterns={'每天一次':'daily','仅提醒一次':'once','每周指定日':'weekly','每日时间段内重复':'interval'}
 pattern=st.selectbox('重复方式',list(patterns))
 limited=st.checkbox('限定生效日期范围',value=False,disabled=pattern=='仅提醒一次')
@@ -43,7 +52,7 @@ with st.form('create_schedule'):
     if st.form_submit_button('创建提醒计划',type='primary'):
         try:
             store.add_schedule(token,target['id'],title,kind,clock.strftime('%H:%M'),start_date=begin,end_date=end,repeat=patterns[pattern],end_clock=finish.strftime('%H:%M') if finish else None,interval_minutes=int(interval),weekdays=[labels.index(x) for x in weekdays])
-            st.success('提醒计划已创建')
+            st.success('已为 '+target_label+' 创建提醒计划，到期事项会显示在该成员的待办中。')
         except (ValueError,PermissionError) as exc: st.error(str(exc))
 st.subheader(target['name']+'的提醒计划')
 for task in store.schedules(token,target['id']):

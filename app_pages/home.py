@@ -45,7 +45,7 @@ with recent:
                 stamp=datetime.fromisoformat(row['time']).astimezone().strftime('%m.%d %H:%M')
                 st.write(labels.get(row.get('mode'),'服务操作')+'　·　'+stamp)
         else: st.caption('你的使用记录会显示在这里。从一次问诊或家庭关怀开始。')
-        if not public_mode() and profile.get('role')=='admin': st.page_link('app_pages/monitor.py',label='查看运行记录',icon=':material/arrow_forward:')
+        if profile.get('role')=='admin': st.page_link('app_pages/monitor.py',label='查看运行记录',icon=':material/arrow_forward:')
 with guide:
     with st.container(border=True,height='stretch'):
         st.subheader('一次更清楚的问诊',icon=':material/clinical_notes:')

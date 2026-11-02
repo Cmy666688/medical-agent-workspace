@@ -19,6 +19,9 @@ session_tokens = 200000
 calls_per_minute = 30
 input_price = 0.0
 output_price = 0.0
+price_currency = ""
+# configured_rates or deepseek_peak_upper_bound; bookkeeping estimates, not invoices.
+pricing_basis = "configured_rates"
 fallback_input_price = 0.0
 fallback_output_price = 0.0
 vision_input_price = 0.0

@@ -51,13 +51,10 @@ navigation={
     '家庭组': [st.Page('app_pages/family_home.py',title='我的家庭',icon=':material/family_restroom:'),st.Page('app_pages/agent_family.py',title='家庭成员与留言',icon=':material/groups:'),st.Page('app_pages/agent_care.py',title='家属照护',icon=':material/diversity_1:'),st.Page('app_pages/agent_schedule.py',title='关怀提醒',icon=':material/alarm:')],
     '项目管理': [st.Page('app_pages/monitor.py',title='运行监控',icon=':material/monitoring:'),st.Page('app_pages/evaluation.py',title='评估与设置',icon=':material/tune:')]
 }
-if public_mode():
+if profile.get('role')!='admin':
     navigation.pop('项目管理')
     navigation['账户'].extend(st.Page(management_notice,title='服务管理',url_path=route,visibility='hidden') for route in ('monitor','evaluation'))
-    st.session_state.developer_mode=False
-elif profile.get('role')!='admin':
-    navigation.pop('项目管理')
-    navigation['账户'].extend(st.Page(management_notice,title='服务管理',url_path=route,visibility='hidden') for route in ('monitor','evaluation'))
+if public_mode():st.session_state.developer_mode=False
 if profile.get('role')=='admin':
     navigation['用户与权限']=[st.Page('app_pages/users.py',title='用户管理',icon=':material/manage_accounts:')]
 else:

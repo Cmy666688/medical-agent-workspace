@@ -36,3 +36,9 @@ jobs:
         run: python -m unittest test_shared_user_store
       - name: Test family membership feedback and navigation
         run: python -m unittest test_family_membership_feedback
+      - name: Test reminder delegation consent and recipient isolation
+        run: python -m unittest test_reminder_delegation
+      - name: Test public administrator project management
+        run: python -m unittest test_public_management
+      - name: Test transparent costs and retrieval comparison
+        run: python -m unittest test_cost_evaluation_ui

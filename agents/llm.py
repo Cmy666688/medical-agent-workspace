@@ -36,6 +36,8 @@ class LLMConfig:
     budget_tokens: int = 12000
     input_price: float = 0
     output_price: float = 0
+    price_currency: str = ''
+    pricing_basis: str = 'configured_rates'
     fallback_url: str = ''
     fallback_model: str = ''
     fallback_key: str = ''
@@ -137,7 +139,7 @@ class LLMClient:
                         output_price=config.output_price if provider=='primary' else config.fallback_output_price
                         priced=(input_price or output_price) and inp is not None and out is not None
                         cost=(inp*input_price+out*output_price)/1_000_000 if priced else None
-                        record(session,request,'llm',agent=agent,provider=provider,model=model,attempt=attempt+1,input_tokens=inp,output_tokens=out,cost=cost,latency_ms=(time.perf_counter()-started)*1000)
+                        record(session,request,'llm',agent=agent,provider=provider,model=model,attempt=attempt+1,input_tokens=inp,output_tokens=out,cost=cost,price_currency=config.price_currency,pricing_basis=config.pricing_basis,input_unit_price=input_price,output_unit_price=output_price,latency_ms=(time.perf_counter()-started)*1000)
                         return value
                     except (httpx.HTTPError,ValueError,KeyError,IndexError,TypeError) as exc:
                         status=exc.response.status_code if isinstance(exc,httpx.HTTPStatusError) else None

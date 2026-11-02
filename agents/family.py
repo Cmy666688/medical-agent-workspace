@@ -40,6 +40,8 @@ def _initialize(db):
     CREATE INDEX IF NOT EXISTS login_sessions_identity ON login_sessions(identity);
     CREATE TABLE IF NOT EXISTS account_controls(identity TEXT PRIMARY KEY,role TEXT NOT NULL DEFAULT 'user',enabled INTEGER NOT NULL DEFAULT 1);
     CREATE TABLE IF NOT EXISTS account_audit(id TEXT PRIMARY KEY,actor TEXT,target TEXT,action TEXT,time TEXT);
+    CREATE TABLE IF NOT EXISTS reminder_access_requests(id TEXT PRIMARY KEY,requester TEXT,target TEXT,status TEXT,created TEXT,resolved TEXT);
+    CREATE UNIQUE INDEX IF NOT EXISTS reminder_request_pending ON reminder_access_requests(requester,target) WHERE status='pending';
     ''')
     for table,column in [('messages','recipient'),('schedules','settings')]:
         if column not in {r['name'] for r in db.execute('PRAGMA table_info('+table+')')}:
@@ -58,7 +60,7 @@ def _initialize(db):
 
 @contextmanager
 def connect():
-    with database(DB,_initialize,'family-accounts-2') as db:
+    with database(DB,_initialize,'family-accounts-3') as db:
         yield db
 
 def actor(db,token):
@@ -145,12 +147,88 @@ def set_grant(token,viewer,read,manage):
         person=actor(db,token)
         if not db.execute('SELECT id FROM members WHERE id=? AND group_id=?',(viewer,person['group_id'])).fetchone(): raise PermissionError('成员不在家庭组中')
         db.execute('INSERT OR REPLACE INTO grants VALUES (?,?,?,?)',(person['id'],viewer,int(read),int(manage)))
+        if manage:
+            db.execute("UPDATE reminder_access_requests SET status='approved',resolved=? WHERE requester=? AND target=? AND status='pending'",(now().isoformat(),viewer,person['id']))
+        else:
+            db.execute("UPDATE reminder_access_requests SET status='revoked',resolved=? WHERE requester=? AND target=? AND status='approved'",(now().isoformat(),viewer,person['id']))
         audit(db,person,viewer,'update_sharing')
 
 def grants_given(token):
     with connect() as db:
         person=actor(db,token)
         return [dict(x) for x in db.execute('SELECT viewer,can_read,can_manage FROM grants WHERE target=?',(person['id'],))]
+
+
+def _reminder_delegate(db,person,viewer,allowed):
+    old=db.execute('SELECT can_read,can_manage FROM grants WHERE target=? AND viewer=?',(person['id'],viewer)).fetchone()
+    if not old and not allowed:return
+    if not old or bool(old['can_manage'])!=allowed:
+        db.execute('INSERT INTO grants VALUES (?,?,?,?) ON CONFLICT(target,viewer) DO UPDATE SET can_manage=excluded.can_manage',
+                   (person['id'],viewer,int(old['can_read']) if old else 0,int(allowed)))
+        audit(db,person,viewer,'allow_reminder_delegate' if allowed else 'revoke_reminder_delegate')
+    if allowed:
+        db.execute("UPDATE reminder_access_requests SET status='approved',resolved=? WHERE requester=? AND target=? AND status='pending'",(now().isoformat(),viewer,person['id']))
+    else:
+        db.execute("UPDATE reminder_access_requests SET status='revoked',resolved=? WHERE requester=? AND target=? AND status='approved'",(now().isoformat(),viewer,person['id']))
+
+
+def set_reminder_delegates(token,viewers):
+    if not isinstance(viewers,list) or any(not isinstance(x,str) for x in viewers):raise ValueError('请选择有效的家庭成员')
+    with connect() as db:
+        db.execute('BEGIN IMMEDIATE');person=actor(db,token)
+        others={row['id'] for row in db.execute('SELECT id FROM members WHERE group_id=? AND id!=?',(person['group_id'],person['id']))}
+        selected=set(viewers)
+        if not selected<=others:raise PermissionError('只能授权当前家庭的其他成员')
+        for viewer in others:_reminder_delegate(db,person,viewer,viewer in selected)
+
+
+def request_reminder_access(token,target):
+    with connect() as db:
+        db.execute('BEGIN IMMEDIATE');person=actor(db,token)
+        if not db.execute('SELECT 1 FROM members WHERE id=? AND group_id=?',(target,person['group_id'])).fetchone():raise PermissionError('对方不在当前家庭')
+        if target==person['id']:raise ValueError('自己的提醒无需申请授权')
+        grant=db.execute('SELECT can_manage FROM grants WHERE target=? AND viewer=?',(target,person['id'])).fetchone()
+        if grant and grant['can_manage']:return None
+        pending=db.execute("SELECT id FROM reminder_access_requests WHERE requester=? AND target=? AND status='pending'",(person['id'],target)).fetchone()
+        if pending:return pending['id']
+        key=uuid.uuid4().hex
+        db.execute("INSERT INTO reminder_access_requests VALUES (?,?,?,'pending',?,NULL)",(key,person['id'],target,now().isoformat()))
+        audit(db,person,target,'request_reminder_access')
+        return key
+
+
+def reminder_requests(token):
+    with connect() as db:
+        person=actor(db,token)
+        return [dict(row) for row in db.execute("""
+            SELECT r.id,r.requester,r.created,m.name,a.username
+            FROM reminder_access_requests r JOIN members m ON m.id=r.requester
+            LEFT JOIN identity_members l ON l.member=m.id LEFT JOIN accounts a ON a.identity=l.identity
+            WHERE r.target=? AND r.status='pending' AND m.group_id=? ORDER BY r.created
+        """,(person['id'],person['group_id']))]
+
+
+def reminder_request_status(token,target):
+    with connect() as db:
+        person=actor(db,token)
+        if not db.execute('SELECT 1 FROM members WHERE id=? AND group_id=?',(target,person['group_id'])).fetchone():raise PermissionError('对方不在当前家庭')
+        row=db.execute('SELECT status FROM reminder_access_requests WHERE requester=? AND target=? ORDER BY created DESC LIMIT 1',(person['id'],target)).fetchone()
+        return row['status'] if row else None
+
+
+def respond_reminder_access(token,key,approved):
+    if not isinstance(approved,bool):raise ValueError('授权选择无效')
+    with connect() as db:
+        db.execute('BEGIN IMMEDIATE');person=actor(db,token)
+        row=db.execute('SELECT * FROM reminder_access_requests WHERE id=? AND target=?',(key,person['id'])).fetchone()
+        if not row:raise PermissionError('仅提醒所属成员本人可处理这条申请')
+        if not db.execute('SELECT 1 FROM members WHERE id=? AND group_id=?',(row['requester'],person['group_id'])).fetchone():raise PermissionError('申请人已不在当前家庭')
+        if row['status']!='pending':return row['status']
+        if approved:_reminder_delegate(db,person,row['requester'],True)
+        status='approved' if approved else 'declined'
+        db.execute('UPDATE reminder_access_requests SET status=?,resolved=? WHERE id=?',(status,now().isoformat(),key))
+        audit(db,person,row['requester'],'approve_reminder_access' if approved else 'decline_reminder_access')
+        return status
 
 def rotate_invite(token):
     invitation=secrets.token_urlsafe(24)

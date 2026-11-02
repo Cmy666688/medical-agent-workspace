@@ -45,16 +45,26 @@ def require_member():
         st.page_link('app_pages/family_home.py',label='查看我的家庭',icon=':material/family_restroom:')
         st.stop()
 
-def target_picker(permission='can_read'):
-    choices=[x for x in store.members(st.session_state.family_token) if x[permission]]
+def target_picker(permission='can_read',include_ungranted=False):
+    person=store.profile(st.session_state.family_token)
+    choices=[x for x in store.members(st.session_state.family_token) if include_ungranted or x[permission]]
     if not choices:
         st.info('暂无成员授予这项权限。'); st.stop()
     preferred=st.session_state.pop('preferred_target_'+permission,None)
-    key='target_'+permission+'_'+store.profile(st.session_state.family_token)['id']
-    if preferred:
-        match=next((r for r in choices if r['id']==preferred),None)
-        if match: st.session_state[key]=match
-    return st.selectbox('选择成员',choices,format_func=lambda x:x['name'],key=key)
+    key='target_'+permission+'_'+person['id']
+    ids=[row['id'] for row in choices]
+    cached=st.session_state.get(key)
+    if isinstance(cached,dict):st.session_state[key]=cached.get('id')
+    if st.session_state.get(key) not in ids:st.session_state[key]=person['id'] if person['id'] in ids else ids[0]
+    if preferred in ids:st.session_state[key]=preferred
+    roster={row['id']:row for row in choices}
+    def label(mid):
+        row=roster[mid]
+        name=row['name']+(' · @'+row['username'] if row.get('username') else '')
+        if include_ungranted:name+='（我自己）' if mid==person['id'] else '（可代设）' if row[permission] else '（待授权）'
+        return name
+    selected=st.selectbox('选择成员',ids,format_func=label,key=key)
+    return roster[selected]
 
 @st.fragment(run_every='20s')
 def inbox():
@@ -115,4 +125,8 @@ def global_reminder():
         if any(x['id'] not in seen for x in pending): st.toast('有新的家庭关怀提醒，请查看待办并确认。',icon=':material/alarm:')
         st.session_state.seen_notices=seen|{x['id'] for x in pending}
         st.page_link('app_pages/agent_schedule.py',label='查看我的待办')
+        requests=store.reminder_requests(token)
+        if requests:
+            st.caption('待处理的代设提醒申请：'+str(len(requests)))
+            st.page_link('app_pages/agent_schedule.py',label='处理提醒授权',icon=':material/verified_user:')
     except PermissionError: st.caption('家庭连接已失效，请重新连接。')

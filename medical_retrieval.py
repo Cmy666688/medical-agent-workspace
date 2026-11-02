@@ -130,7 +130,7 @@ def main():
     client=MilvusClient(uri=str(out/'full.db'))
     create_collection(client,'bge_before',before_docs,records); create_collection(client,'bge_after',after_docs,records)
     chosen=next(i for i,x in enumerate(evals) if '胆囊' not in x['query'] and '胆囊' not in x['positive_name'])
-    report={'before':before_metrics,'after':after_metrics,'selected_before':before_rows[chosen],'selected_after':after_rows[chosen],'milvus_before_top10':search(client,'bge_before',before_q[chosen],records),'milvus_after_top10':search(client,'bge_after',after_q[chosen],records)}
+    report={'before':before_metrics,'after':after_metrics,'before_rows':before_rows,'after_rows':after_rows,'selected_before':before_rows[chosen],'selected_after':after_rows[chosen],'milvus_before_top10':search(client,'bge_before',before_q[chosen],records),'milvus_after_top10':search(client,'bge_after',after_q[chosen],records)}
     client.close(); (out/'evaluation.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8'); print(json.dumps(report,ensure_ascii=False,indent=2))
 
 if __name__=='__main__': main()

@@ -32,9 +32,9 @@ def _index_info(path,modified,size):
 
 def llm_config():
     from api_config import configured_values
-    from public_policy import public_mode
-    values=configured_values()
-    if public_mode(): return LLMConfig(**values)
+    from public_policy import public_mode,is_project_admin
+    values=dict(configured_values())
+    if public_mode() and not is_project_admin(): return LLMConfig(**values)
     for key in LLMConfig.__dataclass_fields__:
         state_key={'model':'llm_model','budget_tokens':'budget'}.get(key,key)
         if state_key in st.session_state: values[key]=st.session_state[state_key]
