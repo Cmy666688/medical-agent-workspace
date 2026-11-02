@@ -19,9 +19,11 @@ def _initialize(db):
     CREATE TABLE IF NOT EXISTS consultation_card_inputs(
         conversation TEXT, request TEXT, original TEXT,
         PRIMARY KEY(conversation,request));
+    CREATE TABLE IF NOT EXISTS conversation_preferences(owner TEXT PRIMARY KEY,active TEXT);
+    CREATE TABLE IF NOT EXISTS conversation_continuations(conversation TEXT PRIMARY KEY,source TEXT);
     ''')
 
-def _connect(): return database(DB,_initialize,'conversations-2')
+def _connect(): return database(DB,_initialize,'conversations-3')
 def _owner(token):
     profile=identity_profile(token)
     if not profile.get('username'): raise PermissionError('请先登录账号')
@@ -60,6 +62,37 @@ def get_context(token,key):
     owner=_owner(token)
     with _connect() as db: return json.loads(_owned(db,owner,key)['context'])
 
+
+def active(token):
+    owner=_owner(token)
+    with _connect() as db:
+        row=db.execute('SELECT c.id FROM conversation_preferences p JOIN conversations c ON c.id=p.active AND c.owner=p.owner WHERE p.owner=?',(owner,)).fetchone()
+        return row['id'] if row else None
+
+
+def select_active(token,key):
+    owner=_owner(token)
+    with _connect() as db:
+        _owned(db,owner,key)
+        db.execute('INSERT INTO conversation_preferences VALUES (?,?) ON CONFLICT(owner) DO UPDATE SET active=excluded.active',(owner,key))
+
+
+def continue_from(token,key):
+    """Copy an owned snapshot to a fresh conversation; never reset daily quotas."""
+    owner=_owner(token); new_key=uuid.uuid4().hex; stamp=_now()
+    with _connect() as db:
+        db.execute('BEGIN IMMEDIATE'); row=_owned(db,owner,key)
+        db.execute('INSERT INTO conversations VALUES (?,?,?,?,?,?,1)',
+                   (new_key,owner,('续聊 · '+row['title'])[:80],stamp,stamp,row['context']))
+        db.execute('INSERT INTO turns SELECT ?,request,payload,position FROM turns WHERE conversation=?',(new_key,key))
+        card=_card(db,key)
+        if card['version']:
+            db.execute('INSERT INTO consultation_card_versions VALUES (?,?,?,?,?)',
+                       (new_key,1,stamp,'从原对话保留上下文续聊',json.dumps(card['fields'],ensure_ascii=False,sort_keys=True)))
+        db.execute('INSERT INTO consultation_card_inputs SELECT ?,request,original FROM consultation_card_inputs WHERE conversation=?',(new_key,key))
+        db.execute('INSERT INTO conversation_continuations VALUES (?,?)',(new_key,key))
+    return new_key
+
 def append(token,key,turn,context=None):
     owner=_owner(token)
     if not isinstance(turn,dict) or not all(field in turn for field in ('request','question','answer','trace','evidences','conflicts')): raise ValueError('对话记录不完整')
@@ -94,6 +127,8 @@ def delete(token,key):
         db.execute('DELETE FROM turns WHERE conversation=?',(key,))
         db.execute('DELETE FROM consultation_card_versions WHERE conversation=?',(key,))
         db.execute('DELETE FROM consultation_card_inputs WHERE conversation=?',(key,))
+        db.execute('DELETE FROM conversation_preferences WHERE owner=? AND active=?',(owner,key))
+        db.execute('DELETE FROM conversation_continuations WHERE conversation=?',(key,))
         db.execute('DELETE FROM conversations WHERE id=?',(key,))
 
 

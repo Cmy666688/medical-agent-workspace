@@ -18,6 +18,8 @@ from agents import telemetry
 import ui
 
 account=accounts.register('performance_user','Performance-password-123','Performance test')['token']
+from agents.user_management import bootstrap_admin
+bootstrap_admin('performance_user')
 member=f.create_family('Performance family','Me',account)
 person=f.profile(member['token'])
 app=AppTest.from_file('app.py',default_timeout=40).run()
@@ -25,7 +27,7 @@ app.session_state.personal_token=account
 app.session_state.family_token=member['token']
 app.run()
 pages=['coordinator','agent_consultation','agent_medication','agent_risk','agent_education',
-       'agent_family','agent_care','agent_schedule','family_home','knowledge','monitor']
+       'agent_family','agent_care','agent_schedule','family_home','knowledge','monitor','users']
 result={}
 f._last_poll.clear()
 profiler=cProfile.Profile()

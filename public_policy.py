@@ -7,7 +7,7 @@ def public_mode():
 def management_notice():
     import streamlit as st
     st.title('此功能由服务管理者维护')
-    st.info('公网入口提供问诊、资料查询与家庭协作。模型接口配置及运行管理请在本机工作台操作。')
+    st.info('问诊、资料查询与家庭协作可在工作台使用。服务配置与用户管理仅向相应管理员开放。')
 
 def reserve_public(db,session,tokens):
     """Shared daily limits cannot be reset by starting a new conversation."""

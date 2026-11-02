@@ -15,7 +15,8 @@ with mode:
 from result_ui import render_output,debug_output,friendly_error
 from vision_ui import vision_panel
 vision_panel("consultation")
-from conversation_ui import restore_context
+from conversation_ui import restore_context,conversation_header
+conversation_header()
 restore_context()
 with st.expander('个人情况 · 补充后可减少重复追问',icon=':material/person:'):
     cols=st.columns(3)

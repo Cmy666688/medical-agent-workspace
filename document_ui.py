@@ -4,7 +4,9 @@ from agents.documents import read_upload,DocumentStore
 
 def document_panel():
     from public_policy import public_mode
-    if public_mode():
+    from agents.family import identity_profile
+    token=st.session_state.get('personal_token')
+    if public_mode() or not token or identity_profile(token).get('role')!='admin':
         st.caption('共享参考库由服务管理者维护。')
         return
     with st.expander('添加参考资料 / 增量索引',icon=':material/library_add:'):

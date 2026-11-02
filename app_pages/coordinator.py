@@ -3,7 +3,7 @@ import streamlit as st
 from agents import conversations as store
 from agents.consultation_card import context_from_card
 from consultation_run_ui import submit_consultation
-from conversation_ui import restore_context
+from conversation_ui import restore_context,conversation_header
 from coordinator_ui import render_workflow
 from execution_timeline import render_timeline
 from ui import llm_config
@@ -17,6 +17,7 @@ with st.container(border=True):
     st.markdown('**信息整理 → 危险信号检查 → 资料检索与用药核对（并行）→ 资料解读与汇总**')
     st.caption('配置模型后可执行问诊增强、来源重排及风险 / 用药复核。危险信号优先提示，参考资料随后继续加载。')
 
+conversation_header()
 restore_context()
 context = store.get_context(st.session_state.personal_token, st.session_state.conversation_id)
 with st.expander('个人情况 · 与当前问诊共用', icon=':material/person:'):

@@ -53,7 +53,7 @@ def bootstrap_identity():
         except PermissionError:
             st.session_state.clear()
             st.session_state.identity_browser_command=dict(action='clear')
-            st.session_state.auth_notice='登录已过期或在其他设备修改了密码，请重新登录。'
+            st.session_state.auth_notice='登录已过期、已撤销或账号已停用，请重新登录或联系管理员。'
             st.rerun()
     _storage(key='identity_storage',data=dict(current=bool(st.session_state.get('personal_token')),command=st.session_state.get('identity_browser_command',{})),default={'token':None},on_token_change=_restore,height=0)
     return profile

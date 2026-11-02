@@ -116,6 +116,16 @@ def account_panel():
         st.badge('@'+profile['username'],icon=':material/verified_user:',color='green')
         st.write('你的家庭关系与授权记录已关联到此账号。')
         recovery_card()
+        st.badge('管理员' if profile.get('role')=='admin' else '普通用户',icon=':material/verified_user:')
+        with st.expander('修改我的称呼'):
+            with st.form('update_my_display'):
+                display=st.text_input('我的称呼',value=profile['display'],max_chars=40)
+                if st.form_submit_button('保存称呼'):
+                    try: accounts.update_display(token,display); st.rerun()
+                    except ValueError as exc: st.error(str(exc))
+        st.page_link('app_pages/conversations.py',label='我的历史对话 · 选择并继续',icon=':material/history:')
+        if profile.get('role')=='admin':
+            st.page_link('app_pages/users.py',label='进入用户管理',icon=':material/manage_accounts:')
         with st.container(horizontal=True):
             st.page_link('app_pages/family_home.py',label='进入我的家庭',icon=':material/family_restroom:')
             if st.button('退出登录',icon=':material/logout:'): disconnect_identity()

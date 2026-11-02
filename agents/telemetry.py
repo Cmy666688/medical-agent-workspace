@@ -42,11 +42,18 @@ def feedback_stats(rows):
     values=[v for v in latest.values() if v is not None]
     return dict(count=len(values),positive=sum(v is True for v in values),negative=sum(v is False for v in values),coverage=len(values)/len(requests) if requests else 0)
 
-def events(limit=5000,kind=None,exclude_session=None):
+def events(limit=5000,kind=None,exclude_session=None,user_id=None):
     conditions=[]; params=[]
     if kind is not None: conditions.append('kind=?'); params.append(kind)
     if exclude_session is not None: conditions.append('session!=?'); params.append(exclude_session)
+    if user_id is not None: conditions.append("json_extract(data,'$.user_id')=?"); params.append(user_id)
     where=' WHERE '+' AND '.join(conditions) if conditions else ''
     with connect() as db:
         rows = db.execute('SELECT * FROM events'+where+' ORDER BY time DESC LIMIT ?',[*params,min(max(int(limit),1),5000)]).fetchall()
     return [dict(time=r[0], session=r[1], request=r[2], kind=r[3], **json.loads(r[4])) for r in rows]
+
+
+def personal_events(token,limit=4,kind='request'):
+    from .family import identity_profile
+    owner=identity_profile(token)
+    return events(limit=limit,kind=kind,user_id='member_'+owner['id'])

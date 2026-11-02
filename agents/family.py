@@ -36,6 +36,8 @@ def _initialize(db):
     CREATE TABLE IF NOT EXISTS login_attempts(username_hash TEXT,time REAL);
     CREATE INDEX IF NOT EXISTS login_attempts_user_time ON login_attempts(username_hash,time);
     CREATE INDEX IF NOT EXISTS login_sessions_identity ON login_sessions(identity);
+    CREATE TABLE IF NOT EXISTS account_controls(identity TEXT PRIMARY KEY,role TEXT NOT NULL DEFAULT 'user',enabled INTEGER NOT NULL DEFAULT 1);
+    CREATE TABLE IF NOT EXISTS account_audit(id TEXT PRIMARY KEY,actor TEXT,target TEXT,action TEXT,time TEXT);
     ''')
     for table,column in [('messages','recipient'),('schedules','settings')]:
         if column not in {r['name'] for r in db.execute('PRAGMA table_info('+table+')')}:
@@ -54,7 +56,7 @@ def _initialize(db):
 
 @contextmanager
 def connect():
-    with database(DB,_initialize,'family-accounts-1') as db:
+    with database(DB,_initialize,'family-accounts-2') as db:
         yield db
 
 def actor(db,token):
@@ -66,6 +68,8 @@ def actor(db,token):
         return dict(row)
     row=db.execute('SELECT * FROM members WHERE secret_hash=?',(digest(token),)).fetchone()
     if not row: raise PermissionError('成员访问密钥无效，请重新连接')
+    linked=db.execute('SELECT c.enabled FROM identity_members l JOIN account_controls c ON c.identity=l.identity WHERE l.member=?',(row['id'],)).fetchone()
+    if linked and not linked['enabled']: raise PermissionError('账号已停用，请联系管理员')
     return dict(row)
 
 def authorize(db,token,target,permission='can_read'):
@@ -300,7 +304,9 @@ def identity_actor(db,token):
     else:
         row=db.execute('SELECT i.id,i.display FROM identities i LEFT JOIN accounts a ON a.identity=i.id WHERE i.secret_hash=? AND a.identity IS NULL',(digest(token),)).fetchone()
     if not row: raise PermissionError('个人身份凭证无效')
-    return dict(row)
+    control=db.execute('SELECT role,enabled FROM account_controls WHERE identity=?',(row['id'],)).fetchone()
+    if control and not control['enabled']: raise PermissionError('账号已停用，请联系管理员')
+    return dict(row,role=control['role'] if control else 'user')
 
 def create_identity(display):
     if not display.strip(): raise ValueError('请填写你的称呼')

@@ -20,17 +20,18 @@ if not profile or not profile.get('username'):
         if profile: account_panel()
         else: auth_panel()
     # Known feature URLs render the login view without loading protected page scripts.
-    routes=['home','coordinator','conversations','knowledge','agent_consultation','agent_retrieval','agent_medication','agent_risk','agent_education','family_home','agent_family','agent_care','agent_schedule','monitor','evaluation']
+    routes=['home','coordinator','conversations','knowledge','agent_consultation','agent_retrieval','agent_medication','agent_risk','agent_education','family_home','agent_family','agent_care','agent_schedule','monitor','evaluation','users']
     public=[st.Page(locked_page,title='登录 / 注册',url_path='sign-in',default=True),st.Page('app_pages/account.py',title='登录 / 注册')]
     public.extend(st.Page(locked_page,title='登录 / 注册',url_path=route) for route in routes)
     page=st.navigation(public,position='hidden')
     page.run()
     st.stop()
 from conversation_ui import ensure_conversation,recent_conversations
+st.session_state.user_id='member_'+profile['id']
 ensure_conversation()
 with st.sidebar:
     family_switcher()
-    if not public_mode():
+    if not public_mode() and profile.get('role')=='admin':
         with st.popover('显示选项'):
             st.toggle('显示开发调试数据',key='developer_mode',value=False)
     from conversation_ui import new_conversation
@@ -54,6 +55,13 @@ if public_mode():
     navigation.pop('项目管理')
     navigation['账户'].extend(st.Page(management_notice,title='服务管理',url_path=route,visibility='hidden') for route in ('monitor','evaluation'))
     st.session_state.developer_mode=False
+elif profile.get('role')!='admin':
+    navigation.pop('项目管理')
+    navigation['账户'].extend(st.Page(management_notice,title='服务管理',url_path=route,visibility='hidden') for route in ('monitor','evaluation'))
+if profile.get('role')=='admin':
+    navigation['用户与权限']=[st.Page('app_pages/users.py',title='用户管理',icon=':material/manage_accounts:')]
+else:
+    navigation['账户'].append(st.Page(management_notice,title='服务管理',url_path='users',visibility='hidden'))
 page=st.navigation(navigation)
 if st.session_state.pop('open_new_consultation',False): st.switch_page('app_pages/agent_consultation.py')
 if st.session_state.get('family_token'):

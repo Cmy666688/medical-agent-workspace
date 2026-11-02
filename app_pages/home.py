@@ -1,7 +1,7 @@
 from datetime import datetime
 import streamlit as st
 from agents.family import identity_profile,my_families,now
-from agents.telemetry import events
+from agents.telemetry import personal_events
 from ui import llm_config,index_info
 from agent_ui import agent_overview
 from public_policy import public_mode
@@ -38,15 +38,14 @@ recent,guide=st.columns([1.2,1],gap='medium')
 with recent:
     with st.container(border=True,height='stretch'):
         st.subheader('最近活动',icon=':material/history:')
-        rows=events(limit=4,kind='request',exclude_session='integration_test')
-        if public_mode(): rows=[row for row in events(limit=200,kind='request') if row.get('user_id')==st.session_state.user_id][:4]
+        rows=personal_events(st.session_state.personal_token)
         labels={'family':'家庭协作','independent':'单项助手操作','knowledge':'医疗资料查询','local':'本地问诊','llm':'在线问诊'}
         if rows:
             for row in rows:
                 stamp=datetime.fromisoformat(row['time']).astimezone().strftime('%m.%d %H:%M')
                 st.write(labels.get(row.get('mode'),'服务操作')+'　·　'+stamp)
         else: st.caption('你的使用记录会显示在这里。从一次问诊或家庭关怀开始。')
-        if not public_mode(): st.page_link('app_pages/monitor.py',label='查看运行记录',icon=':material/arrow_forward:')
+        if not public_mode() and profile.get('role')=='admin': st.page_link('app_pages/monitor.py',label='查看运行记录',icon=':material/arrow_forward:')
 with guide:
     with st.container(border=True,height='stretch'):
         st.subheader('一次更清楚的问诊',icon=':material/clinical_notes:')

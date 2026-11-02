@@ -26,6 +26,8 @@ def _hash(password,salt):
     return hashlib.pbkdf2_hmac('sha256',password.encode('utf-8'),salt,ITERATIONS).hex()
 
 def _session(db,identity,remember=False):
+    control=db.execute('SELECT enabled FROM account_controls WHERE identity=?',(identity,)).fetchone()
+    if control and not control['enabled']: raise PermissionError('账号已停用，请联系管理员。')
     token='session_'+secrets.token_urlsafe(32)
     expires=family.now()+timedelta(days=30 if remember else 1)
     db.execute('DELETE FROM login_sessions WHERE expires<=?',(family.now().isoformat(),))
@@ -84,6 +86,15 @@ def login(username,password,remember=False):
 def logout(token):
     if token and token.startswith('session_'):
         with family.connect() as db: db.execute('DELETE FROM login_sessions WHERE secret_hash=?',(family.digest(token),))
+
+
+def update_display(token,display):
+    if not isinstance(display,str) or not display.strip() or len(display.strip())>40:
+        raise ValueError('称呼需为 1～40 字。')
+    with family.connect() as db:
+        db.execute('BEGIN IMMEDIATE')
+        person=family.identity_actor(db,token)
+        db.execute('UPDATE identities SET display=? WHERE id=?',(display.strip(),person['id']))
 
 def change_password(token,current_password,new_password,remember=False):
     _password(new_password)
